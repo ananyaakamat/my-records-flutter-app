@@ -374,7 +374,13 @@ class HomeScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();
-              // TODO: Navigate to folder contents
+              // Folder contents feature will be implemented in future updates
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Folder contents feature coming soon!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
             },
             child: const Text('Open Folder'),
           ),

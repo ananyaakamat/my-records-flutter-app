@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,13 +19,13 @@ class SecurityService {
       final List<BiometricType> availableBiometrics =
           await _localAuth.getAvailableBiometrics();
 
-      print('SecurityService: canCheckBiometrics=$isAvailable');
-      print('SecurityService: isDeviceSupported=$isDeviceSupported');
-      print('SecurityService: availableBiometrics=$availableBiometrics');
+      debugPrint('SecurityService: canCheckBiometrics=$isAvailable');
+      debugPrint('SecurityService: isDeviceSupported=$isDeviceSupported');
+      debugPrint('SecurityService: availableBiometrics=$availableBiometrics');
 
       return isAvailable && isDeviceSupported && availableBiometrics.isNotEmpty;
     } catch (e) {
-      print('SecurityService: Error checking biometric availability: $e');
+      debugPrint('SecurityService: Error checking biometric availability: $e');
       return false;
     }
   }
@@ -41,30 +42,31 @@ class SecurityService {
   // Authenticate with biometrics
   Future<AuthenticationResult> authenticateWithBiometricsDetailed() async {
     try {
-      print('SecurityService: Starting biometric authentication...');
+      debugPrint('SecurityService: Starting biometric authentication...');
 
       // Check if biometrics are available
       final bool isAvailable = await _localAuth.canCheckBiometrics;
       final bool deviceSupported = await _localAuth.isDeviceSupported();
 
-      print(
+      debugPrint(
           'SecurityService: isAvailable=$isAvailable, deviceSupported=$deviceSupported');
 
       if (!isAvailable || !deviceSupported) {
-        print('SecurityService: Biometrics not available or not supported');
+        debugPrint(
+            'SecurityService: Biometrics not available or not supported');
         return AuthenticationResult.failedBiometric;
       }
 
       // Check for enrolled biometrics
       final availableBiometrics = await getAvailableBiometrics();
-      print('SecurityService: availableBiometrics=$availableBiometrics');
+      debugPrint('SecurityService: availableBiometrics=$availableBiometrics');
 
       if (availableBiometrics.isEmpty) {
-        print('SecurityService: No enrolled biometrics found');
+        debugPrint('SecurityService: No enrolled biometrics found');
         return AuthenticationResult.failedBiometric;
       }
 
-      print('SecurityService: Attempting biometric authentication...');
+      debugPrint('SecurityService: Attempting biometric authentication...');
 
       final bool isAuthenticated = await _localAuth.authenticate(
         localizedReason: 'Please authenticate to access your personal records',
@@ -74,10 +76,10 @@ class SecurityService {
         ),
       );
 
-      print('SecurityService: Authentication result: $isAuthenticated');
+      debugPrint('SecurityService: Authentication result: $isAuthenticated');
 
       if (isAuthenticated) {
-        print('SecurityService: Authentication successful!');
+        debugPrint('SecurityService: Authentication successful!');
         // Auto-enable biometric authentication if this is the first successful authentication
         final isEnabled = await isBiometricEnabled();
         if (!isEnabled) {
@@ -85,11 +87,11 @@ class SecurityService {
         }
         return AuthenticationResult.success;
       } else {
-        print('SecurityService: Authentication failed or cancelled');
+        debugPrint('SecurityService: Authentication failed or cancelled');
         return AuthenticationResult.failedBiometric;
       }
     } catch (e) {
-      print('SecurityService: Biometric authentication error: $e');
+      debugPrint('SecurityService: Biometric authentication error: $e');
       // Biometric authentication error - return failure
       return AuthenticationResult.failedBiometric;
     }

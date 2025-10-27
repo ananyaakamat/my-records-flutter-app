@@ -53,36 +53,37 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
     }
 
     try {
-      print('SecuritySetupScreen: Starting PIN setup...');
+      debugPrint('SecuritySetupScreen: Starting PIN setup...');
       final success = await _securityService.setupPin(_pinController.text);
-      print('SecuritySetupScreen: PIN setup result: $success');
+      debugPrint('SecuritySetupScreen: PIN setup result: $success');
 
       if (!mounted || _setupCompleted) {
-        print(
+        debugPrint(
             'SecuritySetupScreen: Widget disposed or setup already completed, exiting');
         return;
       }
 
       if (success) {
         if (_enableBiometric && _biometricAvailable) {
-          print('SecuritySetupScreen: Enabling biometric authentication...');
+          debugPrint(
+              'SecuritySetupScreen: Enabling biometric authentication...');
           await _securityService.setBiometricEnabled(true);
         }
 
         if (!mounted || _setupCompleted) {
-          print(
+          debugPrint(
               'SecuritySetupScreen: Widget disposed during biometric setup, exiting');
           return;
         }
 
-        print(
+        debugPrint(
             'SecuritySetupScreen: Setup completed successfully, calling onSetupComplete');
         _setupCompleted = true;
 
         // Call the callback - this will trigger navigation and dispose this widget
         widget.onSetupComplete();
       } else {
-        print('SecuritySetupScreen: PIN setup failed');
+        debugPrint('SecuritySetupScreen: PIN setup failed');
         if (mounted && !_setupCompleted) {
           setState(() {
             _errorMessage = 'Failed to setup security. Please try again.';
@@ -90,7 +91,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
         }
       }
     } catch (e) {
-      print('SecuritySetupScreen: Exception during setup: $e');
+      debugPrint('SecuritySetupScreen: Exception during setup: $e');
       if (mounted && !_setupCompleted) {
         setState(() {
           _errorMessage = 'Setup failed: ${e.toString()}';

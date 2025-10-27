@@ -44,7 +44,7 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
       }
 
       if (_authenticationCompleted) {
-        print(
+        debugPrint(
             'SecurityWrapperScreen: Authentication already completed during initialize');
         return;
       }
@@ -84,16 +84,6 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
     }
   }
 
-  void _navigateToSetup() {
-    // Don't use pushReplacement - it removes this widget from the stack
-    // Instead, set loading state and show setup screen within this widget
-    if (mounted && !_authenticationCompleted) {
-      setState(() {
-        _isLoading = false; // Hide loading screen to show setup
-      });
-    }
-  }
-
   void _navigateToAuth() {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -120,10 +110,10 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
   }
 
   void _onAuthenticationSuccess() {
-    print('SecurityWrapperScreen: _onAuthenticationSuccess called');
+    debugPrint('SecurityWrapperScreen: _onAuthenticationSuccess called');
 
     if (_authenticationCompleted) {
-      print(
+      debugPrint(
           'SecurityWrapperScreen: Authentication already completed, skipping');
       return;
     }
@@ -133,9 +123,10 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
       setState(() {
         _isAuthenticated = true;
       });
-      print('SecurityWrapperScreen: Authentication state set to true');
+      debugPrint('SecurityWrapperScreen: Authentication state set to true');
     } else {
-      print('SecurityWrapperScreen: Widget not mounted, skipping setState');
+      debugPrint(
+          'SecurityWrapperScreen: Widget not mounted, skipping setState');
     }
   }
 
@@ -155,7 +146,7 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
     // Show setup screen directly instead of navigating
     return SecuritySetupScreen(
       onSetupComplete: () {
-        print('SecurityWrapperScreen: Setup completed callback triggered');
+        debugPrint('SecurityWrapperScreen: Setup completed callback triggered');
         _onAuthenticationSuccess();
       },
     );
