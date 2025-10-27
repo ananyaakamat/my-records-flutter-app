@@ -1,15 +1,16 @@
 # My Records - Personal Records Management App
 
-A Flutter Android application for managing personal records including certificates, documents, educational records, and personal information.
+A Flutter application for organizing and managing personal documents, certificates, educational records, and other important information in a folder-based system.
 
-## Features
+## 🌟 Features
 
-- **Certificates Management**: Store and organize your certificates and awards
-- **Documents Storage**: Manage important documents with categorization
-- **Educational Records**: Track your educational background and achievements
-- **Personal Information**: Maintain personal details and profile information
-- **SQLite Database**: Local data storage for offline access
-- **Material Design**: Modern UI following Material Design principles
+- **📂 Folder-Based Organization**: Create custom folders to categorize your records
+- **🌙 Dark/Light Theme**: Default dark mode with toggle support for user preference
+- **🎨 Customizable Folders**: Choose from multiple colors and icons for folder personalization
+- **📱 Mobile-First Design**: Optimized for mobile devices with responsive UI
+- **🔍 Record Management**: Add, edit, duplicate, and delete folders with ease
+- **💾 Local Storage**: SQLite database for secure local data storage
+- **📊 Record Count Tracking**: Visual indicators showing number of records in each folder
 
 ## Tech Stack
 
