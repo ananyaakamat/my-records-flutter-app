@@ -187,7 +187,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                   maxLines: 2,
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 8),
             Text(
               _formatDateTime(record.createdAt),
@@ -333,7 +333,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 );
-              }).toList(),
+              }),
               const SizedBox(height: 16),
               Text('Created: ${_formatDateTime(record.createdAt)}'),
               const SizedBox(height: 4),

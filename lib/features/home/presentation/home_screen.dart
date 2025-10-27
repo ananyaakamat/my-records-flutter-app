@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../main.dart';
@@ -6,11 +7,147 @@ import '../../folders/presentation/create_folder_dialog.dart';
 import '../../folders/domain/folder_model.dart';
 import '../../records/presentation/record_screen.dart';
 
-class HomeScreen extends ConsumerWidget {
+import '../../records/domain/record_model.dart';
+import '../../../core/database/database_helper.dart';
+
+class SearchResult {
+  final RecordModel record;
+  final FolderModel folder;
+  final String matchedValue;
+
+  SearchResult({
+    required this.record,
+    required this.folder,
+    required this.matchedValue,
+  });
+}
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedFilter = 'All Folders';
+  List<SearchResult> _searchResults = [];
+  bool _isSearching = false;
+  Timer? _debounceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+
+      // Cancel previous timer
+      _debounceTimer?.cancel();
+
+      // Start new timer with 500ms delay
+      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+        _searchRecords();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _searchRecords() async {
+    if (_searchQuery.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _searchResults = [];
+        });
+      }
+      return;
+    }
+
+    final folders = ref.read(folderProvider);
+
+    if (mounted) {
+      setState(() {
+        _isSearching = true;
+      });
+    }
+
+    final DatabaseHelper databaseHelper = DatabaseHelper();
+    List<SearchResult> results = [];
+
+    try {
+      for (final folder in folders) {
+        // Skip this folder if filter is set and doesn't match
+        if (_selectedFilter != 'All Folders' &&
+            folder.name != _selectedFilter) {
+          continue;
+        }
+
+        // Get all records for this folder
+        final List<Map<String, dynamic>> maps = await databaseHelper.query(
+          'records',
+          where: 'folder_id = ?',
+          whereArgs: [folder.id],
+        );
+
+        final records = maps.map((map) => RecordModel.fromMap(map)).toList();
+
+        // Search through each record's field name and field values
+        for (final record in records) {
+          String matchedValue = '';
+          bool foundMatch = false;
+
+          // Check field name
+          if (record.fieldName
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase())) {
+            matchedValue = record.fieldName;
+            foundMatch = true;
+          }
+
+          // Check field values
+          if (!foundMatch) {
+            for (final value in record.fieldValues) {
+              if (value.toLowerCase().contains(_searchQuery.toLowerCase())) {
+                matchedValue = value;
+                foundMatch = true;
+                break;
+              }
+            }
+          }
+
+          if (foundMatch) {
+            results.add(SearchResult(
+              record: record,
+              folder: folder,
+              matchedValue: matchedValue,
+            ));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error searching records: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = results;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final folders = ref.watch(folderProvider);
     final folderCount = ref.watch(folderCountProvider);
     final themeMode = ref.watch(themeProvider);
@@ -56,13 +193,292 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: folders.isEmpty
-          ? _buildEmptyState(context, ref)
-          : _buildFolderList(context, folders, ref),
+      body: Column(
+        children: [
+          _buildSearchSection(context),
+          Expanded(
+            child: _buildMainContent(context, folders, ref),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateFolderDialog(context, ref),
         tooltip: 'Create New Folder',
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildSearchSection(BuildContext context) {
+    final folders = ref.watch(folderProvider);
+    final sortedFolderNames = folders.map((folder) => folder.name).toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          // Search Bar
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search items...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _debounceTimer?.cancel();
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                          _searchResults = [];
+                          _isSearching = false;
+                        });
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surface,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Filter Dropdown
+          Row(
+            children: [
+              Text(
+                'Filter:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
+                      width: 1,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedFilter,
+                      isExpanded: true,
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: 'All Folders',
+                          child: Text('All Folders'),
+                        ),
+                        ...sortedFolderNames.map((folderName) {
+                          return DropdownMenuItem<String>(
+                            value: folderName,
+                            child: Text(folderName),
+                          );
+                        }),
+                      ],
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedFilter = newValue;
+                          });
+
+                          // Cancel previous timer
+                          _debounceTimer?.cancel();
+
+                          // Start new timer with shorter delay for filter changes
+                          _debounceTimer =
+                              Timer(const Duration(milliseconds: 100), () {
+                            _searchRecords();
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainContent(
+      BuildContext context, List<FolderModel> folders, WidgetRef ref) {
+    if (_isSearching) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      if (_searchResults.isEmpty) {
+        return _buildNoResultsState(context);
+      }
+      return _buildSearchResults(context, ref);
+    }
+
+    if (folders.isEmpty) {
+      return _buildEmptyState(context, ref);
+    }
+
+    return _buildFolderList(context, folders, ref);
+  }
+
+  Widget _buildNoResultsState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 80,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No records found',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try searching for different keywords or check other folders',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults(BuildContext context, WidgetRef ref) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16.0),
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final result = _searchResults[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: _buildSearchResultCard(context, result, ref),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchResultCard(
+      BuildContext context, SearchResult result, WidgetRef ref) {
+    return Card(
+      elevation: 2,
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16.0),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: result.folder.color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            result.folder.icon,
+            color: result.folder.color,
+            size: 28,
+          ),
+        ),
+        title: Text(
+          result.record.fieldName,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            // Display field values
+            ...result.record.fieldValues.map((value) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2.0),
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                )),
+            const SizedBox(height: 8),
+            // Display folder name
+            Row(
+              children: [
+                Icon(
+                  Icons.folder,
+                  size: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    result.folder.name,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => RecordScreen(folder: result.folder),
+            ),
+          );
+        },
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'view_folder') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => RecordScreen(folder: result.folder),
+                ),
+              );
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem<String>(
+              value: 'view_folder',
+              child: ListTile(
+                leading: Icon(Icons.folder_open),
+                title: Text('View Folder'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
