@@ -15,8 +15,8 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
       final List<Map<String, dynamic>> maps =
           await _databaseHelper.query('folders');
       final folders = maps.map((map) => FolderModel.fromMap(map)).toList();
-      folders.sort((a, b) =>
-          b.updatedAt.compareTo(a.updatedAt)); // Sort by most recently updated
+      folders.sort(
+          (a, b) => a.sortOrder.compareTo(b.sortOrder)); // Sort by sortOrder
       state = folders;
     } catch (e) {
       debugPrint('Error loading folders: $e');
@@ -26,9 +26,14 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
   Future<void> addFolder(FolderModel folder) async {
     try {
       final now = DateTime.now();
+      final maxSortOrder = state.isEmpty
+          ? 0
+          : state.map((f) => f.sortOrder).reduce((a, b) => a > b ? a : b);
+
       final folderToAdd = folder.copyWith(
         createdAt: now,
         updatedAt: now,
+        sortOrder: maxSortOrder + 1,
       );
 
       final id = await _databaseHelper.insert('folders', folderToAdd.toMap());
@@ -53,9 +58,9 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
 
       state = state.map((f) => f.id == folder.id ? updatedFolder : f).toList();
 
-      // Re-sort by updated time
+      // Re-sort by sort order
       final sortedFolders = List<FolderModel>.from(state);
-      sortedFolders.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      sortedFolders.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
       state = sortedFolders;
     } catch (e) {
       debugPrint('Error updating folder: $e');

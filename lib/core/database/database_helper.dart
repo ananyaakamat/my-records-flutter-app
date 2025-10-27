@@ -18,9 +18,18 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'my_records.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add sort_order column to folders table
+      await db.execute(
+          'ALTER TABLE folders ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -33,6 +42,7 @@ class DatabaseHelper {
         color INTEGER NOT NULL DEFAULT 4280391411,
         icon INTEGER NOT NULL DEFAULT 57415,
         records_count INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )

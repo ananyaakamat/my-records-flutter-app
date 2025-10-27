@@ -7,6 +7,7 @@ class FolderModel {
   final Color color;
   final IconData icon;
   final int recordsCount;
+  final int sortOrder;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,6 +18,7 @@ class FolderModel {
     required this.color,
     required this.icon,
     this.recordsCount = 0,
+    this.sortOrder = 0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -28,6 +30,7 @@ class FolderModel {
     Color? color,
     IconData? icon,
     int? recordsCount,
+    int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -38,6 +41,7 @@ class FolderModel {
       color: color ?? this.color,
       icon: icon ?? this.icon,
       recordsCount: recordsCount ?? this.recordsCount,
+      sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -51,6 +55,7 @@ class FolderModel {
       'color': color.value,
       'icon': icon.codePoint,
       'records_count': recordsCount,
+      'sort_order': sortOrder,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -65,6 +70,7 @@ class FolderModel {
       icon: IconData(map['icon'] ?? Icons.folder.codePoint,
           fontFamily: 'MaterialIcons'),
       recordsCount: map['records_count'] ?? 0,
+      sortOrder: map['sort_order'] ?? 0,
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
     );
@@ -72,7 +78,7 @@ class FolderModel {
 
   @override
   String toString() {
-    return 'FolderModel(id: $id, name: $name, description: $description, color: $color, icon: $icon, recordsCount: $recordsCount, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'FolderModel(id: $id, name: $name, description: $description, color: $color, icon: $icon, recordsCount: $recordsCount, sortOrder: $sortOrder, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -85,6 +91,7 @@ class FolderModel {
         other.color == color &&
         other.icon == icon &&
         other.recordsCount == recordsCount &&
+        other.sortOrder == sortOrder &&
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt;
   }
@@ -97,6 +104,7 @@ class FolderModel {
         color.hashCode ^
         icon.hashCode ^
         recordsCount.hashCode ^
+        sortOrder.hashCode ^
         createdAt.hashCode ^
         updatedAt.hashCode;
   }

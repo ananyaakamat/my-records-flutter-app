@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/home/presentation/home_screen.dart';
+import 'features/security/presentation/security_wrapper_screen.dart';
 
 // Theme provider for managing dark/light mode
 final themeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.dark);
@@ -60,7 +61,9 @@ class MyRecordsApp extends ConsumerWidget {
           elevation: 4,
         ),
       ),
-      home: const HomeScreen(),
+      home: const SecurityWrapperScreen(
+        child: HomeScreen(),
+      ),
     );
   }
 }

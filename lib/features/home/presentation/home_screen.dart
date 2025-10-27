@@ -107,12 +107,20 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildFolderList(
       BuildContext context, List<FolderModel> folders, WidgetRef ref) {
-    return ListView.builder(
+    // Sort folders by sortOrder
+    final sortedFolders = List<FolderModel>.from(folders)
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    return ReorderableListView.builder(
       padding: const EdgeInsets.all(16.0),
-      itemCount: folders.length,
+      itemCount: sortedFolders.length,
+      onReorder: (oldIndex, newIndex) {
+        _handleReorder(oldIndex, newIndex, sortedFolders, ref);
+      },
       itemBuilder: (context, index) {
-        final folder = folders[index];
+        final folder = sortedFolders[index];
         return Padding(
+          key: ValueKey(folder.id),
           padding: const EdgeInsets.only(bottom: 12.0),
           child: _buildFolderCard(context, folder, ref),
         );
@@ -145,6 +153,8 @@ class HomeScreen extends ConsumerWidget {
             fontWeight: FontWeight.w600,
             fontSize: 16,
           ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,6 +168,8 @@ class HomeScreen extends ConsumerWidget {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 13,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
               ),
             ],
             const SizedBox(height: 8),
@@ -171,51 +183,84 @@ class HomeScreen extends ConsumerWidget {
             ),
           ],
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) =>
-              _handleFolderAction(context, value, folder, ref),
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.edit, size: 18),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'duplicate',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.content_copy, size: 18),
-                  SizedBox(width: 8),
-                  Text('Duplicate'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.delete, size: 18, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
-        ),
+        trailing: SizedBox(
+            width: 80, // Fixed width to prevent overflow
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Drag handle
+                Icon(
+                  Icons.drag_handle,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+                const SizedBox(width: 4), // Reduced spacing
+                PopupMenuButton<String>(
+                  onSelected: (value) =>
+                      _handleFolderAction(context, value, folder, ref),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'duplicate',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.content_copy, size: 18),
+                          SizedBox(width: 8),
+                          Text('Duplicate'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            )),
         onTap: () {
           // Navigate to folder contents
           _showFolderDetailsDialog(context, folder);
         },
       ),
     );
+  }
+
+  void _handleReorder(
+      int oldIndex, int newIndex, List<FolderModel> folders, WidgetRef ref) {
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+
+    // Create a copy of the list
+    final updatedFolders = List<FolderModel>.from(folders);
+    final item = updatedFolders.removeAt(oldIndex);
+    updatedFolders.insert(newIndex, item);
+
+    // Update sort orders
+    for (int i = 0; i < updatedFolders.length; i++) {
+      final updatedFolder = updatedFolders[i].copyWith(sortOrder: i);
+      ref.read(folderProvider.notifier).updateFolder(updatedFolder);
+    }
   }
 
   void _showCreateFolderDialog(BuildContext context, WidgetRef ref) {
@@ -255,8 +300,10 @@ class HomeScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Folder'),
-        content: Text(
-            'Are you sure you want to delete "${folder.name}"? This action cannot be undone.'),
+        content: SingleChildScrollView(
+          child: Text(
+              'Are you sure you want to delete "${folder.name}"? This action cannot be undone.'),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -292,24 +339,32 @@ class HomeScreen extends ConsumerWidget {
           children: [
             Icon(folder.icon, color: folder.color),
             const SizedBox(width: 8),
-            Expanded(child: Text(folder.name)),
+            Expanded(
+              child: Text(
+                folder.name,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (folder.description != null &&
-                folder.description!.isNotEmpty) ...[
-              Text('Description: ${folder.description}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (folder.description != null &&
+                  folder.description!.isNotEmpty) ...[
+                Text('Description: ${folder.description}'),
+                const SizedBox(height: 8),
+              ],
+              Text('Records: ${folder.recordsCount}'),
               const SizedBox(height: 8),
+              Text('Created: ${_formatDateTime(folder.createdAt)}'),
+              const SizedBox(height: 8),
+              Text('Last Updated: ${_formatDateTime(folder.updatedAt)}'),
             ],
-            Text('Records: ${folder.recordsCount}'),
-            const SizedBox(height: 8),
-            Text('Created: ${_formatDateTime(folder.createdAt)}'),
-            const SizedBox(height: 8),
-            Text('Last Updated: ${_formatDateTime(folder.updatedAt)}'),
-          ],
+          ),
         ),
         actions: [
           TextButton(
