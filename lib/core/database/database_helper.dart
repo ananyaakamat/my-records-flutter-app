@@ -18,7 +18,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'my_records.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -29,6 +29,20 @@ class DatabaseHelper {
       // Add sort_order column to folders table
       await db.execute(
           'ALTER TABLE folders ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+    }
+    if (oldVersion < 3) {
+      // Create records table
+      await db.execute('''
+        CREATE TABLE records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          folder_id INTEGER NOT NULL,
+          field_name TEXT NOT NULL,
+          field_value TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (folder_id) REFERENCES folders (id) ON DELETE CASCADE
+        )
+      ''');
     }
   }
 
@@ -107,6 +121,19 @@ class DatabaseHelper {
         profile_image_path TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    // Create records table
+    await db.execute('''
+      CREATE TABLE records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        folder_id INTEGER NOT NULL,
+        field_name TEXT NOT NULL,
+        field_value TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (folder_id) REFERENCES folders (id) ON DELETE CASCADE
       )
     ''');
   }

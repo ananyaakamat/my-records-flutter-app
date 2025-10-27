@@ -4,6 +4,7 @@ import '../../../main.dart';
 import '../../folders/providers/folder_provider.dart';
 import '../../folders/presentation/create_folder_dialog.dart';
 import '../../folders/domain/folder_model.dart';
+import '../../records/presentation/record_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -238,8 +239,12 @@ class HomeScreen extends ConsumerWidget {
               ],
             )),
         onTap: () {
-          // Navigate to folder contents
-          _showFolderDetailsDialog(context, folder);
+          // Navigate to record screen
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => RecordScreen(folder: folder),
+            ),
+          );
         },
       ),
     );
@@ -331,64 +336,6 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  void _showFolderDetailsDialog(BuildContext context, FolderModel folder) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(folder.icon, color: folder.color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                folder.name,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (folder.description != null &&
-                  folder.description!.isNotEmpty) ...[
-                Text('Description: ${folder.description}'),
-                const SizedBox(height: 8),
-              ],
-              Text('Records: ${folder.recordsCount}'),
-              const SizedBox(height: 8),
-              Text('Created: ${_formatDateTime(folder.createdAt)}'),
-              const SizedBox(height: 8),
-              Text('Last Updated: ${_formatDateTime(folder.updatedAt)}'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Folder contents feature will be implemented in future updates
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Folder contents feature coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            child: const Text('Open Folder'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showHelpDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -426,9 +373,5 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
