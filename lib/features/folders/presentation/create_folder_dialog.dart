@@ -64,6 +64,12 @@ class _CreateFolderDialogState extends ConsumerState<CreateFolderDialog> {
     super.dispose();
   }
 
+  /// Helper method to capitalize the first letter of a string
+  String _capitalizeFirstLetter(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.folderToEdit != null;
@@ -248,12 +254,18 @@ class _CreateFolderDialogState extends ConsumerState<CreateFolderDialog> {
 
   void _saveFolder() {
     if (_formKey.currentState?.validate() ?? false) {
+      // Auto-capitalize folder name and description
+      String capitalizedName =
+          _capitalizeFirstLetter(_nameController.text.trim());
+      String? capitalizedDescription =
+          _descriptionController.text.trim().isEmpty
+              ? null
+              : _capitalizeFirstLetter(_descriptionController.text.trim());
+
       final folder = FolderModel(
         id: widget.folderToEdit?.id,
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
+        name: capitalizedName,
+        description: capitalizedDescription,
         color: _selectedColor,
         icon: _selectedIcon,
         recordsCount: widget.folderToEdit?.recordsCount ?? 0,

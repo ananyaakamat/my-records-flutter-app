@@ -24,7 +24,10 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _checkBiometricAvailability();
-    _tryBiometricAuthentication();
+    // Delay biometric authentication to give widget time to fully mount
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryBiometricAuthentication();
+    });
   }
 
   Future<void> _checkBiometricAvailability() async {

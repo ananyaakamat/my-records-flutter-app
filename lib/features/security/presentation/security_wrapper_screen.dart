@@ -20,6 +20,7 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
   bool _isLoading = true;
   bool _isAuthenticated = false;
   bool _authenticationCompleted = false;
+  bool _needsAuthentication = false;
 
   @override
   void initState() {
@@ -68,45 +69,32 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
           break;
         case AuthenticationResult.needsPin:
         case AuthenticationResult.failedBiometric:
-          _navigateToAuth();
+          // Set state to show auth screen instead of navigating
+          if (mounted && !_authenticationCompleted) {
+            setState(() {
+              _isLoading = false;
+              _needsAuthentication = true;
+            });
+          }
           break;
         case AuthenticationResult.failedPin:
-          _navigateToAuth();
+          // Set state to show auth screen instead of navigating
+          if (mounted && !_authenticationCompleted) {
+            setState(() {
+              _isLoading = false;
+              _needsAuthentication = true;
+            });
+          }
           break;
       }
     } catch (e) {
       if (mounted && !_authenticationCompleted) {
         setState(() {
           _isLoading = false;
+          _needsAuthentication = true;
         });
       }
-      _navigateToAuth();
     }
-  }
-
-  void _navigateToAuth() {
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => AuthScreen(
-          onAuthenticationSuccess: () => _onAuthenticationSuccess(),
-        ),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(0.0, 1.0);
-          const end = Offset.zero;
-          const curve = Curves.easeInOut;
-
-          var tween = Tween(begin: begin, end: end).chain(
-            CurveTween(curve: curve),
-          );
-
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
-    );
   }
 
   void _onAuthenticationSuccess() {
@@ -141,6 +129,17 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
 
     if (_isAuthenticated) {
       return widget.child;
+    }
+
+    // Show authentication screen if PIN/biometric is needed
+    if (_needsAuthentication) {
+      return AuthScreen(
+        onAuthenticationSuccess: () {
+          debugPrint(
+              'SecurityWrapperScreen: Auth completed callback triggered');
+          _onAuthenticationSuccess();
+        },
+      );
     }
 
     // Show setup screen directly instead of navigating
