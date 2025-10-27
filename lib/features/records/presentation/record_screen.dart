@@ -8,21 +8,68 @@ import 'add_record_dialog.dart';
 
 class RecordScreen extends ConsumerStatefulWidget {
   final FolderModel folder;
+  final String? highlightRecordId;
 
-  const RecordScreen({super.key, required this.folder});
+  const RecordScreen({
+    super.key,
+    required this.folder,
+    this.highlightRecordId,
+  });
 
   @override
   ConsumerState<RecordScreen> createState() => _RecordScreenState();
 }
 
 class _RecordScreenState extends ConsumerState<RecordScreen> {
+  final ScrollController _scrollController = ScrollController();
+  String? _highlightedRecordId;
+
   @override
   void initState() {
     super.initState();
+    _highlightedRecordId = widget.highlightRecordId;
+
     // Load records for this folder when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(recordProvider.notifier).loadRecordsForFolder(widget.folder.id!);
+      // Scroll to highlighted record after records are loaded
+      if (_highlightedRecordId != null) {
+        _scrollToHighlightedRecord();
+      }
     });
+  }
+
+  void _scrollToHighlightedRecord() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_highlightedRecordId != null && mounted) {
+        final records = ref.read(recordProvider);
+        final targetId = int.tryParse(_highlightedRecordId!);
+        final index = records.indexWhere((record) => record.id == targetId);
+        if (index != -1 && _scrollController.hasClients) {
+          // Calculate scroll position (assuming each card is approximately 120 pixels high with padding)
+          final double targetOffset = index * 132.0; // Card height + padding
+          _scrollController.animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+          // Clear the highlight after scrolling
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() {
+                _highlightedRecordId = null;
+              });
+            }
+          });
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -127,6 +174,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
 
   Widget _buildRecordsList(BuildContext context, List<RecordModel> records) {
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(16.0),
       itemCount: records.length,
       itemBuilder: (context, index) {
@@ -140,95 +188,113 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   }
 
   Widget _buildRecordCard(BuildContext context, RecordModel record) {
+    final isHighlighted = _highlightedRecordId != null &&
+        int.tryParse(_highlightedRecordId!) == record.id;
+
     return Card(
-      elevation: 2,
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16.0),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: widget.folder.color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.description,
-            color: widget.folder.color,
-            size: 28,
-          ),
-        ),
-        title: Text(
-          record.fieldName,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            // Display all field values
-            ...record.fieldValues.asMap().entries.map((entry) {
-              final index = entry.key;
-              final value = entry.value;
-              return Padding(
-                padding: EdgeInsets.only(
-                    bottom: index < record.fieldValues.length - 1 ? 4.0 : 0.0),
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
+      elevation: isHighlighted ? 8 : 2,
+      color: isHighlighted
+          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+          : null,
+      child: Container(
+        decoration: isHighlighted
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 2,
                 ),
-              );
-            }),
-            const SizedBox(height: 8),
-            Text(
-              _formatDateTime(record.createdAt),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+              )
+            : null,
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(16.0),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: widget.folder.color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
+            child: Icon(
+              Icons.description,
+              color: widget.folder.color,
+              size: 28,
+            ),
+          ),
+          title: Text(
+            record.fieldName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              // Display all field values
+              ...record.fieldValues.asMap().entries.map((entry) {
+                final index = entry.key;
+                final value = entry.value;
+                return Padding(
+                  padding: EdgeInsets.only(
+                      bottom:
+                          index < record.fieldValues.length - 1 ? 4.0 : 0.0),
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+              Text(
+                _formatDateTime(record.createdAt),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          trailing: PopupMenuButton<String>(
+            onSelected: (value) => _handleRecordAction(context, value, record),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit, size: 18),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.delete, size: 18, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          onTap: () {
+            _showRecordDetailsDialog(context, record);
+          },
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) => _handleRecordAction(context, value, record),
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.edit, size: 18),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.delete, size: 18, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        onTap: () {
-          _showRecordDetailsDialog(context, record);
-        },
       ),
     );
   }

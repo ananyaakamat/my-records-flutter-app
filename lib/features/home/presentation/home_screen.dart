@@ -454,7 +454,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => RecordScreen(folder: result.folder),
+              builder: (context) => RecordScreen(
+                folder: result.folder,
+                highlightRecordId: result.record.id?.toString(),
+              ),
             ),
           );
         },
@@ -463,7 +466,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             if (value == 'view_folder') {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => RecordScreen(folder: result.folder),
+                  builder: (context) => RecordScreen(
+                    folder: result.folder,
+                    highlightRecordId: result.record.id?.toString(),
+                  ),
                 ),
               );
             }
