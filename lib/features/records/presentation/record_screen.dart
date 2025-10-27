@@ -58,6 +58,13 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              _showHelpDialog(context);
+            },
+            tooltip: 'Help',
+          ),
+          IconButton(
             icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: () {
               ref.read(themeProvider.notifier).state =
@@ -170,32 +177,14 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
               return Padding(
                 padding: EdgeInsets.only(
                     bottom: index < record.fieldValues.length - 1 ? 4.0 : 0.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (record.fieldValues.length > 1) ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.only(top: 6, right: 8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                    Expanded(
-                      child: Text(
-                        value,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
               );
             }).toList(),
@@ -339,27 +328,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                   padding: EdgeInsets.only(
                       bottom:
                           index < record.fieldValues.length - 1 ? 12.0 : 0.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (record.fieldValues.length > 1) ...[
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(top: 6, right: 12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                      Expanded(
-                        child: SelectableText(
-                          value,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ),
-                    ],
+                  child: SelectableText(
+                    value,
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 );
               }).toList(),
@@ -387,6 +358,45 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
               );
             },
             child: const Text('Edit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Help'),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'My Records - Record Management',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+              Text('• Tap the + button to create new records'),
+              SizedBox(height: 8),
+              Text('• Tap on a record card to view full details'),
+              SizedBox(height: 8),
+              Text('• Use the menu (⋮) to edit or delete records'),
+              SizedBox(height: 8),
+              Text('• Records are sorted alphabetically by field name'),
+              SizedBox(height: 8),
+              Text('• Each record can have multiple field values'),
+              SizedBox(height: 8),
+              Text('• Long press on text to copy to clipboard'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Got it'),
           ),
         ],
       ),

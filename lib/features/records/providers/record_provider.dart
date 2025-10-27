@@ -17,8 +17,9 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
         whereArgs: [folderId],
       );
       final records = maps.map((map) => RecordModel.fromMap(map)).toList();
-      // Sort by creation date, newest first
-      records.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Sort alphabetically by field name
+      records.sort((a, b) =>
+          a.fieldName.toLowerCase().compareTo(b.fieldName.toLowerCase()));
       state = records;
     } catch (e) {
       debugPrint('Error loading records: $e');
@@ -36,7 +37,11 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
       final id = await _databaseHelper.insert('records', recordToAdd.toMap());
       final newRecord = recordToAdd.copyWith(id: id);
 
-      state = [newRecord, ...state];
+      final updatedList = [...state, newRecord];
+      // Sort alphabetically by field name
+      updatedList.sort((a, b) =>
+          a.fieldName.toLowerCase().compareTo(b.fieldName.toLowerCase()));
+      state = updatedList;
 
       // Update folder record count
       await _updateFolderRecordCount(record.folderId, ref);
@@ -56,7 +61,12 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
         [record.id],
       );
 
-      state = state.map((r) => r.id == record.id ? updatedRecord : r).toList();
+      final updatedList =
+          state.map((r) => r.id == record.id ? updatedRecord : r).toList();
+      // Sort alphabetically by field name to maintain order
+      updatedList.sort((a, b) =>
+          a.fieldName.toLowerCase().compareTo(b.fieldName.toLowerCase()));
+      state = updatedList;
     } catch (e) {
       debugPrint('Error updating record: $e');
     }
