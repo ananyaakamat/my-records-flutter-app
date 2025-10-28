@@ -126,10 +126,10 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
       return;
     }
 
-    if (_pinController.text.length < 4) {
+    if (_pinController.text.length != 6) {
       if (mounted && !_setupCompleted) {
         setState(() {
-          _errorMessage = 'PIN must be at least 4 digits';
+          _errorMessage = 'PIN must be exactly 6 digits';
         });
       }
       return;

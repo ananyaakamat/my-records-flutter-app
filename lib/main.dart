@@ -2,11 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/security/presentation/security_wrapper_screen.dart';
+import 'core/services/backup_service.dart';
 
 // Theme provider for managing dark/light mode
 final themeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.dark);
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize backup service
+  try {
+    await BackupService.instance.initialize();
+  } catch (e) {
+    debugPrint('Failed to initialize backup service: $e');
+  }
+
   runApp(const ProviderScope(child: MyRecordsApp()));
 }
 

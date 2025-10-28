@@ -6,6 +6,8 @@ import '../../folders/providers/folder_provider.dart';
 import '../../folders/presentation/create_folder_dialog.dart';
 import '../../folders/domain/folder_model.dart';
 import '../../records/presentation/record_screen.dart';
+import '../../security/presentation/change_pin_dialog.dart';
+import 'backup_restore_screen.dart';
 
 import '../../records/domain/record_model.dart';
 import '../../../core/database/database_helper.dart';
@@ -190,6 +192,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _showHelpDialog(context);
             },
             tooltip: 'Help',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              _showSettingsDialog(context);
+            },
+            tooltip: 'Settings',
           ),
         ],
       ),
@@ -794,6 +803,99 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showChangePinHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Help - Change PIN'),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Change PIN',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+              Text('• PIN must be exactly 6 digits'),
+              SizedBox(height: 8),
+              Text('• You need to verify your current PIN first'),
+              SizedBox(height: 8),
+              Text('• Enter your new 6-digit PIN'),
+              SizedBox(height: 8),
+              Text('• Confirm your new PIN to complete the change'),
+              SizedBox(height: 8),
+              Text('• Your PIN secures access to all your records'),
+              SizedBox(height: 8),
+              Text('• Choose a PIN that is easy to remember but secure'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.lock),
+              title: const Text('Change PIN'),
+              trailing: IconButton(
+                icon: const Icon(Icons.help_outline),
+                onPressed: () => _showChangePinHelpDialog(context),
+                tooltip: 'Help',
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                _showChangePinDialog(context);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.backup),
+              title: const Text('Backup & Restore'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const BackupRestoreScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChangePinDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const ChangePinDialog(),
     );
   }
 }
