@@ -107,6 +107,19 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
       debugPrint('Error updating record count: $e');
     }
   }
+
+  Future<void> deleteAllFolders() async {
+    try {
+      // Delete all records first (due to foreign key constraint)
+      await _databaseHelper.delete('records', '1=1', []);
+      // Delete all folders
+      await _databaseHelper.delete('folders', '1=1', []);
+      // Clear the state
+      state = [];
+    } catch (e) {
+      debugPrint('Error deleting all folders: $e');
+    }
+  }
 }
 
 final folderProvider =

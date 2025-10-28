@@ -215,14 +215,24 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.green.shade600),
             const SizedBox(width: 8),
-            const Text('Backup Created Successfully!'),
+            const Expanded(
+              child: Text(
+                'Backup Created Successfully!',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Backup file: $fileName'),
+            Text(
+              'Backup file: $fileName',
+              style: const TextStyle(fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
             const SizedBox(height: 12),
             Text('📁 Folders backed up: ${stats['folders']}'),
             const SizedBox(height: 4),

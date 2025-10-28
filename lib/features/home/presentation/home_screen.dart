@@ -194,6 +194,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             tooltip: 'Help',
           ),
           IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            onPressed: folders.isNotEmpty
+                ? () => _showDeleteAllConfirmationDialog(context, ref)
+                : null,
+            tooltip: 'Delete All Folders',
+            color: folders.isNotEmpty ? Colors.red.shade400 : null,
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
               _showSettingsDialog(context);
@@ -761,6 +769,125 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAllConfirmationDialog(BuildContext context, WidgetRef ref) {
+    final folders = ref.read(folderProvider);
+    final totalRecords =
+        folders.fold(0, (sum, folder) => sum + folder.recordsCount);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red.shade600),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Delete All Folders',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This will permanently delete:',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              Text('• ${folders.length} folders'),
+              const SizedBox(height: 4),
+              Text('• $totalRecords records'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Warning',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'This action cannot be undone. All your folders and their associated records will be permanently deleted.',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              navigator.pop();
+              try {
+                await ref.read(folderProvider.notifier).deleteAllFolders();
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Text(
+                              'All folders and $totalRecords records deleted successfully'),
+                        ],
+                      ),
+                      backgroundColor: Colors.green.shade600,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting folders: $e'),
+                      backgroundColor: Colors.red.shade600,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete All'),
           ),
         ],
       ),
