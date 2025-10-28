@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/security_service.dart';
+import '../../folders/providers/folder_provider.dart';
 import 'security_setup_screen.dart';
 import 'auth_screen.dart';
 
-class SecurityWrapperScreen extends StatefulWidget {
+class SecurityWrapperScreen extends ConsumerStatefulWidget {
   final Widget child;
 
   const SecurityWrapperScreen({
@@ -12,10 +14,11 @@ class SecurityWrapperScreen extends StatefulWidget {
   });
 
   @override
-  State<SecurityWrapperScreen> createState() => _SecurityWrapperScreenState();
+  ConsumerState<SecurityWrapperScreen> createState() =>
+      _SecurityWrapperScreenState();
 }
 
-class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
+class _SecurityWrapperScreenState extends ConsumerState<SecurityWrapperScreen> {
   final SecurityService _securityService = SecurityService();
   bool _isLoading = true;
   bool _isAuthenticated = false;
@@ -128,7 +131,8 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
     }
 
     if (_isAuthenticated) {
-      return widget.child;
+      // Watch folder provider to ensure folders are loaded before showing child
+      return _FolderAwareWrapper(child: widget.child);
     }
 
     // Show authentication screen if PIN/biometric is needed
@@ -165,79 +169,233 @@ class _SecurityWrapperScreenState extends State<SecurityWrapperScreen> {
         ),
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // App Logo/Icon
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color:
-                        Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+        child: Container(
+          // Add horizontal padding to increase width by 20% (reduce content area by 20%)
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.of(context).size.width * 0.1,
+          ),
+          child: Column(
+            children: [
+              // Top spacer to position content in upper-middle area
+              SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+
+              // App Logo/Icon
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.folder,
+                  color: Colors.white,
+                  size: 50,
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // App Title
+              Text(
+                'My Records',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                'Secure • Organized • Accessible',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 16,
+                    ),
+              ),
+
+              const SizedBox(height: 60),
+
+              // Loading Animation
+              Column(
+                children: [
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Initializing Security...',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 14,
+                        ),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.folder,
-                color: Colors.white,
-                size: 50,
+
+              // Bottom spacer to keep content in upper portion
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FolderAwareWrapper extends ConsumerWidget {
+  final Widget child;
+
+  const _FolderAwareWrapper({required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final folderNotifier = ref.read(folderProvider.notifier);
+
+    // Show loading screen until folder provider has been initialized
+    // The folder provider loads folders in its constructor, but we need to wait
+    // for the initial load to complete
+    return FutureBuilder<void>(
+      future: _ensureFoldersLoaded(folderNotifier),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            body: _buildFoldersLoadingScreen(context),
+          );
+        }
+
+        // Once folders are loaded (or loading is complete), show the child
+        return child;
+      },
+    );
+  }
+
+  Future<void> _ensureFoldersLoaded(FolderNotifier folderNotifier) async {
+    // Wait for folders to be loaded
+    await folderNotifier.loadFolders();
+    // Add a small delay to ensure state is fully propagated
+    await Future.delayed(const Duration(milliseconds: 50));
+  }
+
+  Widget _buildFoldersLoadingScreen(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+            Theme.of(context).colorScheme.surface,
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Container(
+          // Add horizontal padding to increase width by 20% (reduce content area by 20%)
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.of(context).size.width * 0.1,
+          ),
+          child: Column(
+            children: [
+              // Top spacer to position content in upper-middle area
+              SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+
+              // App Logo/Icon
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.folder,
+                  color: Colors.white,
+                  size: 50,
+                ),
               ),
-            ),
 
-            const SizedBox(height: 40),
+              const SizedBox(height: 40),
 
-            // App Title
-            Text(
-              'My Records',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-            ),
+              // App Title
+              Text(
+                'My Records',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+              ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            Text(
-              'Secure • Organized • Accessible',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 16,
-                  ),
-            ),
+              Text(
+                'Secure • Organized • Accessible',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 16,
+                    ),
+              ),
 
-            const SizedBox(height: 60),
+              const SizedBox(height: 60),
 
-            // Loading Animation
-            Column(
-              children: [
-                SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).colorScheme.primary,
+              // Loading Animation
+              Column(
+                children: [
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Initializing Security...',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 14,
-                      ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(height: 20),
+                  Text(
+                    'Loading Your Folders...',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 14,
+                        ),
+                  ),
+                ],
+              ),
+
+              // Bottom spacer to keep content in upper portion
+              const Spacer(),
+            ],
+          ),
         ),
       ),
     );
