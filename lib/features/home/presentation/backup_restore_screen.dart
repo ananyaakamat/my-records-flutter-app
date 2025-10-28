@@ -1015,11 +1015,13 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               SizedBox(height: 4),
               Text('• Change frequency to Weekly if preferred'),
               SizedBox(height: 4),
-              Text('• Backups saved to Downloads folder as .json files'),
+              Text(
+                  '• Backups saved to Downloads/my_records folder as .json files'),
               SizedBox(height: 4),
-              Text('• Only runs when device is not in use and charging'),
+              Text(
+                  '• Runs automatically in the background without device constraints'),
               SizedBox(height: 4),
-              Text('• Automatically keeps only 5 most recent backups'),
+              Text('• Automatically keeps only 3 most recent backups'),
               SizedBox(height: 16),
               Text(
                 'Manual Backup:',
@@ -1028,7 +1030,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               SizedBox(height: 8),
               Text('• Tap "Create Backup" to manually backup your data'),
               SizedBox(height: 4),
-              Text('• Requires existing folders to create a backup'),
+              Text(
+                  '• Requires at least one existing folder to create a backup'),
               SizedBox(height: 4),
               Text('• Exports all your folders and their respective records'),
               SizedBox(height: 4),

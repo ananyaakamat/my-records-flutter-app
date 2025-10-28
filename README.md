@@ -29,10 +29,10 @@ A comprehensive Flutter application for organizing and managing personal documen
 ### 💾 Backup & Restore System
 
 - **Automated Backups**: Daily or weekly automatic backups using WorkManager
-- **Background Processing**: Backups run automatically when device is charging and idle
-- **Manual Backup**: Create instant backups on demand
-- **Smart File Management**: Automatically maintains 5 most recent backups
-- **Cloud Compatibility**: JSON format backups saved to Downloads folder
+- **Background Processing**: Backups run automatically in the background without device constraints
+- **Manual Backup**: Create instant backups on demand (requires at least one folder)
+- **Smart File Management**: Automatically maintains 3 most recent backups
+- **Cloud Compatibility**: JSON format backups saved to Downloads/my_records folder
 - **One-Click Restore**: Select and restore from any previous backup
 - **Backup Sharing**: Share backup files directly from the app
 
