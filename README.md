@@ -178,16 +178,19 @@ lib/
 ### 🛠️ Technical Improvements Implemented
 
 1. **Orphaned Record Detection & Cleanup**:
+
    - Automatically identifies records belonging to deleted folders during backup creation
    - Performs real-time database cleanup to remove orphaned records
    - Ensures data integrity by preventing stale record accumulation
 
 2. **Enhanced Backup Statistics**:
+
    - Backup counts now reflect actual valid records only
    - Filters out orphaned records before calculating statistics
    - Provides accurate folder and record counts in success dialogs
 
 3. **Comprehensive Debug Logging**:
+
    - Added detailed logging for backup record filtering process
    - Tracks total records vs. valid records during backup creation
    - Logs orphaned record cleanup operations for transparency
@@ -209,6 +212,7 @@ lib/
 
 **Before Fix**: `DEBUG: Found 13 total records, 11 valid records for 9 folders`
 **After Fix**: `DEBUG: Found 13 total records, 8 valid records for 7 folders`
+
 - Automatically cleaned up 5 orphaned records from deleted folders
 - Backup statistics now accurately reflect only valid, accessible records
 
