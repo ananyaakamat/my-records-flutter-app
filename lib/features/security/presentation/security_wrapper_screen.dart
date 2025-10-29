@@ -5,6 +5,9 @@ import '../../folders/providers/folder_provider.dart';
 import 'security_setup_screen.dart';
 import 'auth_screen.dart';
 
+// Global authentication state provider
+final authenticationStateProvider = StateProvider<bool>((ref) => false);
+
 class SecurityWrapperScreen extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -28,7 +31,18 @@ class _SecurityWrapperScreenState extends ConsumerState<SecurityWrapperScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeAuthentication();
+    // Check if authentication has already been completed
+    final isGloballyAuthenticated = ref.read(authenticationStateProvider);
+
+    if (isGloballyAuthenticated) {
+      setState(() {
+        _isLoading = false;
+        _isAuthenticated = true;
+        _authenticationCompleted = true;
+      });
+    } else {
+      _initializeAuthentication();
+    }
   }
 
   Future<void> _initializeAuthentication() async {
@@ -111,6 +125,8 @@ class _SecurityWrapperScreenState extends ConsumerState<SecurityWrapperScreen> {
 
     if (mounted) {
       _authenticationCompleted = true;
+      // Set global authentication state
+      ref.read(authenticationStateProvider.notifier).state = true;
       setState(() {
         _isAuthenticated = true;
       });

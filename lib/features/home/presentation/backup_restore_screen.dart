@@ -590,6 +590,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       decoration: BoxDecoration(
         color: Colors.grey.shade800,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,6 +816,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       decoration: BoxDecoration(
         color: Colors.grey.shade800,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
