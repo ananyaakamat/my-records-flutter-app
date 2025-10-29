@@ -900,9 +900,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade700,
+        color: Colors.grey.shade800,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade600),
+        border: Border.all(color: Colors.white, width: 1),
       ),
       child: Column(
         children: [

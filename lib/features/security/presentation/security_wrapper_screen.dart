@@ -139,6 +139,21 @@ class _SecurityWrapperScreenState extends ConsumerState<SecurityWrapperScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch authentication state to handle theme changes
+    final globalAuthState = ref.watch(authenticationStateProvider);
+
+    // If global auth state is true but local state is not, update local state
+    if (globalAuthState && !_isAuthenticated && !_isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _isAuthenticated = true;
+            _authenticationCompleted = true;
+          });
+        }
+      });
+    }
+
     if (_isLoading) {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -277,143 +292,68 @@ class _SecurityWrapperScreenState extends ConsumerState<SecurityWrapperScreen> {
   }
 }
 
-class _FolderAwareWrapper extends ConsumerWidget {
+class _FolderAwareWrapper extends ConsumerStatefulWidget {
   final Widget child;
 
   const _FolderAwareWrapper({required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final folderNotifier = ref.read(folderProvider.notifier);
+  ConsumerState<_FolderAwareWrapper> createState() =>
+      _FolderAwareWrapperState();
+}
 
-    // Show loading screen until folder provider has been initialized
-    // The folder provider loads folders in its constructor, but we need to wait
-    // for the initial load to complete
-    return FutureBuilder<void>(
-      future: _ensureFoldersLoaded(folderNotifier),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            body: _buildFoldersLoadingScreen(context),
-          );
-        }
+class _FolderAwareWrapperState extends ConsumerState<_FolderAwareWrapper> {
+  bool _foldersLoaded = false;
+  bool _isLoading = false;
 
-        // Once folders are loaded (or loading is complete), show the child
-        return child;
-      },
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadFoldersOnce();
   }
 
-  Future<void> _ensureFoldersLoaded(FolderNotifier folderNotifier) async {
-    // Wait for folders to be loaded
-    await folderNotifier.loadFolders();
-    // Add a small delay to ensure state is fully propagated
-    await Future.delayed(const Duration(milliseconds: 50));
+  Future<void> _loadFoldersOnce() async {
+    if (_foldersLoaded) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final folderNotifier = ref.read(folderProvider.notifier);
+      await folderNotifier.loadFolders();
+      // Add a small delay to ensure state is fully propagated
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      if (mounted) {
+        setState(() {
+          _foldersLoaded = true;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _foldersLoaded =
+              true; // Set to true even on error to avoid infinite loading
+          _isLoading = false;
+        });
+      }
+    }
   }
 
-  Widget _buildFoldersLoadingScreen(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.primary.withOpacity(0.1),
-            Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-            Theme.of(context).colorScheme.surface,
-          ],
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      // Show a simple loading indicator instead of the full splash screen
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: const Center(
+          child: CircularProgressIndicator(),
         ),
-      ),
-      child: SafeArea(
-        child: Container(
-          // Add horizontal padding to increase width by 20% (reduce content area by 20%)
-          padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.of(context).size.width * 0.1,
-          ),
-          child: Column(
-            children: [
-              // Top spacer to position content in upper-middle area
-              SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+      );
+    }
 
-              // App Logo/Icon
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withOpacity(0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.folder,
-                  color: Colors.white,
-                  size: 50,
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // App Title
-              Text(
-                'My Records',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                'Secure • Organized • Accessible',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 16,
-                    ),
-              ),
-
-              const SizedBox(height: 60),
-
-              // Loading Animation
-              Column(
-                children: [
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Loading Your Folders...',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 14,
-                        ),
-                  ),
-                ],
-              ),
-
-              // Bottom spacer to keep content in upper portion
-              const Spacer(),
-            ],
-          ),
-        ),
-      ),
-    );
+    return widget.child;
   }
 }
