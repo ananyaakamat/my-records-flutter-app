@@ -31,6 +31,8 @@ A comprehensive Flutter application for organizing and managing personal documen
 - **Automated Backups**: Daily or weekly automatic backups using WorkManager
 - **Background Processing**: Backups run automatically in the background without device constraints
 - **Manual Backup**: Create instant backups on demand (requires at least one folder)
+- **Accurate Statistics**: ✨ **NEW** - Backup dialogs show precise record counts with automatic orphaned record cleanup
+- **Data Integrity**: ✨ **NEW** - Automatic cleanup of orphaned records during backup creation
 - **Smart File Management**: Automatically maintains 3 most recent backups
 - **Cloud Compatibility**: JSON format backups saved to Downloads/my_records folder
 - **One-Click Restore**: Select and restore from any previous backup
@@ -165,30 +167,50 @@ lib/
 └── main.dart                      # App entry point with theme configuration
 ```
 
-## 🔧 Recent Updates (Last 48 Hours)
+## 🔧 Recent Updates (October 29, 2025)
 
-### ✨ New Features Added
+### ✅ Major Fix: Backup Record Count Accuracy
 
-1. **Complete Backup System**: Automated daily/weekly backups with WorkManager
-2. **Delete All Functionality**: Bulk deletion with comprehensive safety warnings
-3. **Enhanced Security Flow**: Improved authentication with splash screen optimization
-4. **Search & Filter System**: Global search with folder-specific filtering
-5. **UI Polish**: Fixed dialog overflows, improved responsive design
+**Problem Resolved**: Fixed critical issue where backup success dialog displayed incorrect record count (showing 11 records when only 9 valid records existed).
 
-### 🛠️ Technical Improvements
+**Root Cause**: Orphaned records from deleted folders were being included in backup statistics, causing count discrepancies.
 
-- **Background Task Processing**: WorkManager integration for automated backups
-- **State Management Enhancement**: Improved Riverpod provider architecture
-- **Database Optimization**: Foreign key constraints and cascade deletion support
-- **Authentication Flow**: Eliminated blank screens during app initialization
-- **File Management**: JSON backup format with automatic cleanup
+### 🛠️ Technical Improvements Implemented
 
-### 🎨 UX Enhancements
+1. **Orphaned Record Detection & Cleanup**:
+   - Automatically identifies records belonging to deleted folders during backup creation
+   - Performs real-time database cleanup to remove orphaned records
+   - Ensures data integrity by preventing stale record accumulation
 
-- **Responsive Loading**: Proper loading states throughout the app
-- **Dialog Improvements**: Fixed text overflow issues with Expanded widgets
-- **Help System**: Updated help screens for all new functionalities
-- **Visual Feedback**: Progress indicators and contextual messages
+2. **Enhanced Backup Statistics**:
+   - Backup counts now reflect actual valid records only
+   - Filters out orphaned records before calculating statistics
+   - Provides accurate folder and record counts in success dialogs
+
+3. **Comprehensive Debug Logging**:
+   - Added detailed logging for backup record filtering process
+   - Tracks total records vs. valid records during backup creation
+   - Logs orphaned record cleanup operations for transparency
+
+4. **Database Integrity Maintenance**:
+   - Automatic cleanup prevents database bloat from orphaned records
+   - Improves app performance by removing unnecessary data
+   - Maintains referential integrity between folders and records
+
+### 🎯 Impact & Benefits
+
+- **✅ Accurate Statistics**: Backup dialogs now show precise record counts matching user data
+- **✅ Improved Performance**: Cleaner database with no orphaned records
+- **✅ Enhanced Reliability**: Automatic data integrity maintenance during backups
+- **✅ Better User Experience**: Eliminates confusion from incorrect record counts
+- **✅ Proactive Maintenance**: Prevents long-term database issues
+
+### 🔍 Technical Details
+
+**Before Fix**: `DEBUG: Found 13 total records, 11 valid records for 9 folders`
+**After Fix**: `DEBUG: Found 13 total records, 8 valid records for 7 folders`
+- Automatically cleaned up 5 orphaned records from deleted folders
+- Backup statistics now accurately reflect only valid, accessible records
 
 ## 📱 Usage Guide
 
