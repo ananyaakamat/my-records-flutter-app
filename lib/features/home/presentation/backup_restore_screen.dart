@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -162,14 +162,21 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     });
 
     try {
-      final filePath = await _backupService.createBackup();
+      final result = await _backupService.createBackup();
+      final filePath = result['filePath'] as String;
+      final stats = result['stats'] as Map<String, int>;
+
+      if (kDebugMode) {
+        print('DEBUG: Backup created with stats: $stats');
+      }
 
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
-        _showBackupSuccessDialog(filePath);
+        _showBackupSuccessDialog(filePath,
+            stats: stats, isPasswordProtected: true);
         await _loadBackupInfo();
         await _refreshBackups();
       }
@@ -201,10 +208,16 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     }
   }
 
-  void _showBackupSuccessDialog(String filePath) async {
-    // Get backup statistics
-    final stats = await _backupService.getBackupStats();
+  void _showBackupSuccessDialog(String filePath,
+      {bool isPasswordProtected = false, Map<String, int>? stats}) async {
+    // Use provided stats or get current backup statistics
+    final backupStats = stats ?? await _backupService.getBackupStats();
     final fileName = _backupService.getBackupFileName(filePath);
+
+    if (kDebugMode) {
+      print(
+          'DEBUG: Dialog showing stats - provided: $stats, final: $backupStats');
+    }
 
     if (!mounted) return;
 
@@ -215,10 +228,12 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.green.shade600),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Backup Created Successfully!',
-                style: TextStyle(fontSize: 16),
+                isPasswordProtected
+                    ? 'Password-Protected Backup Created!'
+                    : 'Backup Created Successfully!',
+                style: const TextStyle(fontSize: 16),
               ),
             ),
           ],
@@ -234,13 +249,15 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
               maxLines: 2,
             ),
             const SizedBox(height: 12),
-            Text('📁 Folders backed up: ${stats['folders']}'),
+            Text('Folders backed up: ${backupStats['folders']}'),
             const SizedBox(height: 4),
-            Text('📄 Records backed up: ${stats['records']}'),
+            Text('Records backed up: ${backupStats['records']}'),
             const SizedBox(height: 12),
-            const Text(
-              'Your backup contains all folders and their respective records. Use this file to restore your data if needed.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              isPasswordProtected
+                  ? 'Your password-protected backup contains all folders and their respective records. You will need the password to restore this backup.'
+                  : 'Your backup contains all folders and their respective records. Use this file to restore your data if needed.',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
         ),
@@ -284,38 +301,60 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   }
 
   Future<void> _restoreBackup(BackupInfo backup) async {
-    final confirmed = await _showConfirmDialog(
-      'Restore Backup',
-      'This will replace all current data with the backup data. This action cannot be undone.\n\nAre you sure you want to continue?',
-    );
-
-    if (!confirmed) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
       final backupPaths = await _backupService.getAvailableBackups();
       final backupPath =
           backupPaths.firstWhere((path) => path.contains(backup.id));
 
-      await _backupService.restoreFromBackup(backupPath);
+      // Confirm restore action
+      final confirmed = await _showConfirmDialog(
+        'Restore Backup',
+        'This will replace all current data with the backup data. This action cannot be undone.\n\nAre you sure you want to continue?',
+      );
+
+      if (!confirmed) return;
+
+      // Show password verification dialog
+      final enteredPassword = await _showPasswordVerificationDialog();
+      if (enteredPassword == null) return; // User cancelled
+
+      // Verify the password matches the default password
+      if (enteredPassword != '301976') {
+        _showErrorDialog('Incorrect password! Please try again.');
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Use verified password for restore
+      await _backupService.restoreFromBackup(backupPath,
+          password: enteredPassword);
 
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
-        // Refresh the folder provider to show restored data
-        ref.invalidate(folderProvider);
+        // Use WidgetsBinding to ensure proper lifecycle handling
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            // Refresh the folder provider to show restored data
+            ref.invalidate(folderProvider);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backup restored successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Backup restored successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        });
+
+        // Refresh backup info after restore
+        await _loadBackupInfo();
+        await _refreshBackups();
       }
     } catch (e) {
       if (mounted) {
@@ -431,6 +470,88 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     } catch (e) {
       _showErrorDialog('Failed to save settings: $e');
     }
+  }
+
+  Future<String?> _showPasswordVerificationDialog() async {
+    String password = '';
+    bool showPassword = false;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Enter Password'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter the backup password to restore your data:'),
+              const SizedBox(height: 16),
+              TextField(
+                obscureText: !showPassword,
+                onChanged: (value) => setState(() => password = value),
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                        showPassword ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () =>
+                        setState(() => showPassword = !showPassword),
+                  ),
+                ),
+                autofocus: true,
+                onSubmitted: (value) {
+                  if (value.isNotEmpty) {
+                    Navigator.of(context).pop(value.trim());
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.blue, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This is the same password used to create the backup.',
+                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: password.isNotEmpty
+                  ? () => Navigator.of(context).pop(password.trim())
+                  : null,
+              child: const Text('Restore'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showErrorDialog(String message) {
@@ -936,7 +1057,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${(backup.size / 1024).toStringAsFixed(1)} KB • ${formatter.format(backup.createdTime)}',
+                      '${(backup.size / 1024).toStringAsFixed(1)} KB â€¢ ${formatter.format(backup.createdTime)}',
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade400,
@@ -1015,57 +1136,57 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 8),
-              Text('• Automatic backups run daily by default'),
+              Text('â€¢ Automatic backups run daily by default'),
               SizedBox(height: 4),
-              Text('• Change frequency to Weekly if preferred'),
-              SizedBox(height: 4),
-              Text(
-                  '• Backups saved to Downloads/my_records folder as .json files'),
+              Text('â€¢ Change frequency to Weekly if preferred'),
               SizedBox(height: 4),
               Text(
-                  '• Runs automatically in the background without device constraints'),
+                  'â€¢ Backups saved to Downloads/my_records folder as .enc files'),
               SizedBox(height: 4),
-              Text('• Automatically keeps only 3 most recent backups'),
+              Text(
+                  'â€¢ Runs automatically in the background without device constraints'),
+              SizedBox(height: 4),
+              Text('â€¢ Automatically keeps only 3 most recent backups'),
               SizedBox(height: 16),
               Text(
                 'Manual Backup:',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 8),
-              Text('• Tap "Create Backup" to manually backup your data'),
+              Text('â€¢ Tap "Create Backup" to manually backup your data'),
               SizedBox(height: 4),
               Text(
-                  '• Requires at least one existing folder to create a backup'),
+                  'â€¢ Requires at least one existing folder to create a backup'),
               SizedBox(height: 4),
-              Text('• Exports all your folders and their respective records'),
+              Text('â€¢ Exports all your folders and their respective records'),
               SizedBox(height: 4),
-              Text('• Option to share backup file after creation'),
+              Text('â€¢ Option to share backup file after creation'),
               SizedBox(height: 16),
               Text(
                 'Restore from Backup:',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 8),
-              Text('• Select any .json backup file from your device'),
+              Text('â€¢ Select any .enc backup file from your device'),
               SizedBox(height: 4),
-              Text('• Automatically detects My Records backup files'),
+              Text('â€¢ Automatically detects My Records backup files'),
               SizedBox(height: 4),
-              Text('• Replaces all current data with backup data'),
+              Text('â€¢ Replaces all current data with backup data'),
               SizedBox(height: 4),
-              Text('• This action cannot be undone'),
+              Text('â€¢ This action cannot be undone'),
               SizedBox(height: 4),
-              Text('• Recommended to create backup before restore'),
+              Text('â€¢ Recommended to create backup before restore'),
               SizedBox(height: 16),
               Text(
                 'Settings:',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 8),
-              Text('• Toggle automatic backup on/off'),
+              Text('â€¢ Toggle automatic backup on/off'),
               SizedBox(height: 4),
-              Text('• Choose between Daily or Weekly frequency'),
+              Text('â€¢ Choose between Daily or Weekly frequency'),
               SizedBox(height: 4),
-              Text('• View when the last backup was performed'),
+              Text('â€¢ View when the last backup was performed'),
             ],
           ),
         ),
@@ -1078,4 +1199,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       ),
     );
   }
+
+  /// Show simple password input dialog
 }
