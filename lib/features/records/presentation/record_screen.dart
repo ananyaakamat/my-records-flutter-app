@@ -386,17 +386,41 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                     ),
               ),
               const SizedBox(height: 8),
-              // Display all field values
+              // Display all field values with dynamic date interpretation
               ...record.fieldValues.asMap().entries.map((entry) {
                 final index = entry.key;
                 final value = entry.value;
+                final dateInterpretation = _interpretDateValue(value);
+
                 return Padding(
                   padding: EdgeInsets.only(
                       bottom:
                           index < record.fieldValues.length - 1 ? 12.0 : 0.0),
-                  child: SelectableText(
-                    value,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SelectableText(
+                        value,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      if (dateInterpretation != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          dateInterpretation['text']!,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                color: (dateInterpretation['isExpired'] ==
+                                            true ||
+                                        dateInterpretation['type'] == 'expired')
+                                    ? Colors.red
+                                    : Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                              ),
+                        ),
+                      ],
+                    ],
                   ),
                 );
               }),
@@ -447,7 +471,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
               SizedBox(height: 16),
               Text('• Tap the + button to create new records'),
               SizedBox(height: 8),
-              Text('• Tap on a record card to view full details'),
+              Text('• Tap on any record to display its detailed information'),
               SizedBox(height: 8),
               Text('• Use the menu (⋮) to edit or delete records'),
               SizedBox(height: 8),
@@ -456,6 +480,29 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
               Text('• Each record can have multiple field values'),
               SizedBox(height: 8),
               Text('• Long press on text to copy to clipboard'),
+              SizedBox(height: 16),
+              Text(
+                'Date Format Support',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                  'When entering dates in Field Value, these formats are automatically recognized:'),
+              SizedBox(height: 8),
+              Text('• Numeric: 25/07/2025, 4/3/24, 15-12-2023'),
+              SizedBox(height: 4),
+              Text('• With month names: 4 Mar 2025, 03 April 24'),
+              SizedBox(height: 4),
+              Text('• US format: March 4, 2025, Apr 03, 24'),
+              SizedBox(height: 4),
+              Text('• With hyphens: 4-Mar-2025, 15-Dec-23'),
+              SizedBox(height: 4),
+              Text('• Concatenated: 4March23, 15mar2025, 4Mar2023'),
+              SizedBox(height: 4),
+              Text('• With day names: Mon 4 Mar 2025, Sat 03 April 24'),
+              SizedBox(height: 8),
+              Text(
+                  'The app will automatically calculate age for birth dates or show expiry status for future dates.'),
             ],
           ),
         ),
@@ -467,6 +514,211 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         ],
       ),
     );
+  }
+
+  /// Interpret date values and return age/expiry information
+  Map<String, dynamic>? _interpretDateValue(String value) {
+    final parsedDate = _parseDate(value);
+    if (parsedDate == null) return null;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dateOnly =
+        DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
+
+    if (dateOnly.isBefore(today)) {
+      // Past date - calculate age
+      return _calculateAge(dateOnly, today);
+    } else if (dateOnly.isAfter(today)) {
+      // Future date - calculate time until expiry
+      return _calculateTimeUntilExpiry(dateOnly, today);
+    } else {
+      // Today's date - expired
+      return {
+        'type': 'expired',
+        'text': 'Expired',
+        'color': Colors.red,
+      };
+    }
+  }
+
+  /// Parse various date formats
+  DateTime? _parseDate(String value) {
+    // Remove extra whitespace and normalize
+    final cleanValue = value.trim();
+
+    // Comprehensive date patterns with optional day names
+    final patterns = [
+      // DD/MM/YYYY or D/M/YY (anywhere in text)
+      RegExp(r'(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})'),
+
+      // Day DD Month YYYY formats (e.g., "Sat 03 April 24", "Mon 4 Mar 2025")
+      RegExp(
+          r'(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?\s*(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{2,4})',
+          caseSensitive: false),
+
+      // DD Month YYYY without day name (e.g., "4 Mar 2025", "03 April 24")
+      RegExp(
+          r'(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{2,4})',
+          caseSensitive: false),
+
+      // Month DD, YYYY format (e.g., "March 4, 2025", "Apr 03, 24")
+      RegExp(
+          r'(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{2,4})',
+          caseSensitive: false),
+
+      // D-Mon-YYYY (anywhere in text)
+      RegExp(
+          r'(\d{1,2})\s*[\-\.]\s*(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*[\-\.]\s*(\d{2,4})',
+          caseSensitive: false),
+
+      // DD(Month)YYYY without spaces (e.g., "4March23", "4mar23", "4Mar2023")
+      RegExp(
+          r'(\d{1,2})(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{2,4})',
+          caseSensitive: false),
+    ];
+
+    final monthNames = {
+      // Short month names
+      'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+      'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+      // Full month names
+      'january': 1, 'february': 2, 'march': 3, 'april': 4, 'june': 6,
+      'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11,
+      'december': 12
+    };
+
+    for (int i = 0; i < patterns.length; i++) {
+      final pattern = patterns[i];
+      final match = pattern.firstMatch(cleanValue);
+      if (match != null) {
+        try {
+          int day, month, year;
+
+          if (i == 0) {
+            // Numeric DD/MM/YYYY format
+            day = int.parse(match.group(1)!);
+            month = int.parse(match.group(2)!);
+            year = int.parse(match.group(3)!);
+          } else if (i == 3) {
+            // Month DD, YYYY format (e.g., "March 4, 2025")
+            month = monthNames[match.group(1)!.toLowerCase()] ?? 0;
+            day = int.parse(match.group(2)!);
+            year = int.parse(match.group(3)!);
+          } else if (i == 5) {
+            // DD(Month)YYYY without spaces (e.g., "4March23", "4mar23", "4Mar2023")
+            day = int.parse(match.group(1)!);
+            month = monthNames[match.group(2)!.toLowerCase()] ?? 0;
+            year = int.parse(match.group(3)!);
+          } else {
+            // DD Month YYYY format (with or without day name) or D-Mon-YYYY
+            day = int.parse(match.group(1)!);
+            month = monthNames[match.group(2)!.toLowerCase()] ?? 0;
+            year = int.parse(match.group(3)!);
+          }
+
+          // Handle 2-digit years
+          if (year < 100) {
+            year += (year < 50) ? 2000 : 1900;
+          }
+
+          // Validate ranges
+          if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            return DateTime(year, month, day);
+          }
+        } catch (e) {
+          // Continue to next pattern
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// Calculate age from birth date
+  Map<String, dynamic> _calculateAge(DateTime birthDate, DateTime today) {
+    int years = today.year - birthDate.year;
+    int months = today.month - birthDate.month;
+    int days = today.day - birthDate.day;
+
+    if (days < 0) {
+      months--;
+      final previousMonth = DateTime(today.year, today.month, 0);
+      days += previousMonth.day;
+    }
+
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    // Handle zero values and format text
+    String ageText;
+    if (years == 0 && months == 0 && days == 0) {
+      ageText = "Expired";
+      return {'text': ageText, 'isExpired': true};
+    } else if (years == 0 && months == 0) {
+      ageText = "Age: $days day${days == 1 ? '' : 's'}";
+    } else if (years == 0) {
+      ageText = "Age: $months month${months == 1 ? '' : 's'}";
+      if (days > 0) {
+        ageText += ", $days day${days == 1 ? '' : 's'}";
+      }
+    } else {
+      ageText = "Age: $years year${years == 1 ? '' : 's'}";
+      if (months > 0) {
+        ageText += ", $months month${months == 1 ? '' : 's'}";
+      }
+      if (days > 0) {
+        ageText += ", $days day${days == 1 ? '' : 's'}";
+      }
+    }
+
+    return {'text': ageText, 'isExpired': false};
+  }
+
+  /// Calculate time until expiry
+  Map<String, dynamic> _calculateTimeUntilExpiry(
+      DateTime expiryDate, DateTime today) {
+    int years = expiryDate.year - today.year;
+    int months = expiryDate.month - today.month;
+    int days = expiryDate.day - today.day;
+
+    if (days < 0) {
+      months--;
+      final daysInPreviousMonth =
+          DateTime(expiryDate.year, expiryDate.month, 0).day;
+      days += daysInPreviousMonth;
+    }
+
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    // Handle zero values and format text
+    String expiryText;
+    if (years == 0 && months == 0 && days == 0) {
+      expiryText = "Expired";
+      return {'text': expiryText, 'isExpired': true};
+    } else if (years == 0 && months == 0) {
+      expiryText = "Expires in $days day${days == 1 ? '' : 's'}";
+    } else if (years == 0) {
+      expiryText = "Expires in $months month${months == 1 ? '' : 's'}";
+      if (days > 0) {
+        expiryText += ", $days day${days == 1 ? '' : 's'}";
+      }
+    } else {
+      expiryText = "Expires in $years year${years == 1 ? '' : 's'}";
+      if (months > 0) {
+        expiryText += ", $months month${months == 1 ? '' : 's'}";
+      }
+      if (days > 0) {
+        expiryText += ", $days day${days == 1 ? '' : 's'}";
+      }
+    }
+
+    return {'text': expiryText, 'isExpired': false};
   }
 
   String _formatDateTime(DateTime dateTime) {

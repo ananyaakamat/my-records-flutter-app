@@ -10,7 +10,7 @@ A comprehensive Flutter application for organizing and managing personal documen
 - **� Customizable Folders**: Choose from multiple colors and icons for folder personalization
 - **📊 Record Count Tracking**: Visual indicators showing number of records in each folder
 - **🔄 Drag & Drop Reordering**: Organize folders by dragging them to preferred positions
-- **📋 Bulk Operations**: Delete all folders and records with comprehensive safety warnings
+### 📋 Bulk Operations**: Delete all folders and records with comprehensive safety warnings
 
 ### 🔍 Advanced Search & Navigation
 
@@ -18,6 +18,15 @@ A comprehensive Flutter application for organizing and managing personal documen
 - **Smart Filtering**: Filter search results by specific folders
 - **Debounced Search**: Optimized search with 500ms delay for better performance
 - **Search Result Context**: Shows which folder contains each found record
+
+### 📅 Intelligent Date Processing
+
+- **Dynamic Date Interpretation**: ✨ **NEW** - Automatic recognition of dates in 6+ different formats
+- **Smart Age Calculation**: Calculates age from birth dates with years/months precision
+- **Expiry Tracking**: Shows time remaining until document/certificate expiry
+- **Multi-Format Support**: Handles numeric, text-based, and concatenated date formats
+- **Visual Status Indicators**: Red "Expired" text for current date matches
+- **Interactive Record Details**: Tap any record to see detailed information with date interpretation
 
 ### 🔐 Security & Authentication
 
@@ -167,9 +176,49 @@ lib/
 └── main.dart                      # App entry point with theme configuration
 ```
 
-## 🔧 Recent Updates (October 29, 2025)
+## 🔧 Recent Updates
 
-### ✅ Major Fix: Backup Record Count Accuracy
+### 🆕 Latest Enhancements (October 30, 2025)
+
+#### ✨ Dynamic Date Interpretation System
+
+**New Feature**: Advanced date recognition and intelligent interpretation for record field values.
+
+**Key Capabilities**:
+- **Comprehensive Date Parsing**: Supports 6 different regex patterns for maximum compatibility
+- **Smart Age Calculation**: Automatically calculates age for birth dates (e.g., "25 years, 3 months old")
+- **Expiry Status Tracking**: Shows time remaining until expiry for future dates (e.g., "Expires in 2 years, 1 month")
+- **Current Date Detection**: Displays "Expired" in red for dates matching today's date
+- **Multi-Format Support**: Recognizes dates in various international formats
+
+#### 📅 Supported Date Formats
+
+The app now intelligently recognizes dates in these formats within Field Values:
+
+- **Numeric**: `25/07/2025`, `4/3/24`, `15-12-2023`
+- **With Month Names**: `4 Mar 2025`, `03 April 24`
+- **US Format**: `March 4, 2025`, `Apr 03, 24`
+- **Hyphenated**: `4-Mar-2025`, `15-Dec-23`
+- **Concatenated**: `4March23`, `15mar2025`, `4Mar2023`
+- **With Day Names**: `Mon 4 Mar 2025`, `Sat 03 April 24`
+
+#### 🎯 Enhanced User Experience
+
+- **Interactive Record Details**: Tap any record to view comprehensive details with automatic date interpretation
+- **Smart Year Handling**: 2-digit years are intelligently converted (< 50 = 2000s, >= 50 = 1900s)
+- **Case-Insensitive**: Works with any combination of uppercase/lowercase month names
+- **Contextual Information**: Automatic age/expiry calculations provide meaningful context
+- **Visual Indicators**: Red text for expired items, clear formatting for all date interpretations
+
+#### 📖 Comprehensive Help System
+
+- **Updated Help Screens**: Complete guidance on record interaction and date format support
+- **Clear Examples**: Detailed examples for all supported date formats
+- **User-Friendly Instructions**: Step-by-step guidance for optimal app usage
+
+### ✅ Previous Updates (October 29, 2025)
+
+#### Major Fix: Backup Record Count Accuracy
 
 **Problem Resolved**: Fixed critical issue where backup success dialog displayed incorrect record count (showing 11 records when only 9 valid records existed).
 
@@ -298,7 +347,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 📊 Project Status
 
 - **Current Version**: 1.0.0
-- **Last Updated**: October 2025
+- **Last Updated**: October 30, 2025
 - **Active Development**: ✅ Ongoing
 - **Production Ready**: ✅ Yes
 - **Platform Support**: 📱 Android (iOS support planned)
