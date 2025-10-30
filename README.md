@@ -10,7 +10,8 @@ A comprehensive Flutter application for organizing and managing personal documen
 - **� Customizable Folders**: Choose from multiple colors and icons for folder personalization
 - **📊 Record Count Tracking**: Visual indicators showing number of records in each folder
 - **🔄 Drag & Drop Reordering**: Organize folders by dragging them to preferred positions
-### 📋 Bulk Operations**: Delete all folders and records with comprehensive safety warnings
+
+### 📋 Bulk Operations\*\*: Delete all folders and records with comprehensive safety warnings
 
 ### 🔍 Advanced Search & Navigation
 
@@ -185,6 +186,7 @@ lib/
 **New Feature**: Advanced date recognition and intelligent interpretation for record field values.
 
 **Key Capabilities**:
+
 - **Comprehensive Date Parsing**: Supports 6 different regex patterns for maximum compatibility
 - **Smart Age Calculation**: Automatically calculates age for birth dates (e.g., "25 years, 3 months old")
 - **Expiry Status Tracking**: Shows time remaining until expiry for future dates (e.g., "Expires in 2 years, 1 month")
