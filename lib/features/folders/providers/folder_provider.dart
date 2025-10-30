@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
 import '../domain/folder_model.dart';
+import '../../records/domain/record_model.dart';
 
 class FolderNotifier extends StateNotifier<List<FolderModel>> {
   FolderNotifier() : super([]) {
@@ -78,17 +79,71 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
 
   Future<void> duplicateFolder(FolderModel folder) async {
     try {
+      // Create the duplicated folder first
       final duplicatedFolder = FolderModel(
         name: '${folder.name} (Copy)',
         description: folder.description,
         color: folder.color,
         icon: folder.icon,
-        recordsCount: 0, // New folder starts with 0 records
+        recordsCount: 0, // Will be updated after duplicating records
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
-      await addFolder(duplicatedFolder);
+      // Add the duplicated folder and get its ID
+      final now = DateTime.now();
+      final maxSortOrder = state.isEmpty
+          ? 0
+          : state.map((f) => f.sortOrder).reduce((a, b) => a > b ? a : b);
+
+      final folderToAdd = duplicatedFolder.copyWith(
+        sortOrder: maxSortOrder + 1,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final folderId =
+          await _databaseHelper.insert('folders', folderToAdd.toMap());
+      final newFolder = folderToAdd.copyWith(id: folderId);
+
+      // Get all records from the original folder
+      final List<Map<String, dynamic>> originalRecordMaps =
+          await _databaseHelper.query(
+        'records',
+        where: 'folder_id = ?',
+        whereArgs: [folder.id],
+      );
+
+      // Duplicate all records to the new folder
+      int duplicatedRecordsCount = 0;
+      for (final recordMap in originalRecordMaps) {
+        final originalRecord = RecordModel.fromMap(recordMap);
+        final duplicatedRecord = RecordModel(
+          folderId: folderId,
+          fieldName: originalRecord.fieldName,
+          fieldValues: originalRecord.fieldValues,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        await _databaseHelper.insert('records', duplicatedRecord.toMap());
+        duplicatedRecordsCount++;
+      }
+
+      // Update the folder with correct record count
+      final finalFolder =
+          newFolder.copyWith(recordsCount: duplicatedRecordsCount);
+      await _databaseHelper.update(
+        'folders',
+        finalFolder.toMap(),
+        'id = ?',
+        [folderId],
+      );
+
+      // Update state
+      final updatedList = [...state, finalFolder];
+      updatedList.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      state = updatedList;
     } catch (e) {
       debugPrint('Error duplicating folder: $e');
     }

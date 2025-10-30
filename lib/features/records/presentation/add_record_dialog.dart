@@ -274,8 +274,17 @@ class _AddRecordDialogState extends ConsumerState<AddRecordDialog> {
           _capitalizeFirstLetter(_fieldNameController.text.trim());
 
       // Collect all non-empty field values
+      // Special handling for email fields - preserve original case
       final List<String> validFieldValues = _fieldValueControllers
-          .map((controller) => _capitalizeFirstLetter(controller.text.trim()))
+          .map((controller) {
+            final value = controller.text.trim();
+            // If field name contains "email", preserve original case for field value
+            if (capitalizedFieldName.toLowerCase().contains('email')) {
+              return value;
+            } else {
+              return _capitalizeFirstLetter(value);
+            }
+          })
           .where((value) => value.isNotEmpty)
           .toList();
 
