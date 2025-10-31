@@ -274,16 +274,29 @@ class _AddRecordDialogState extends ConsumerState<AddRecordDialog> {
           _capitalizeFirstLetter(_fieldNameController.text.trim());
 
       // Collect all non-empty field values
-      // Special handling for email fields - preserve original case
+      // Special handling for URLs and email fields - preserve original case
       final List<String> validFieldValues = _fieldValueControllers
           .map((controller) {
             final value = controller.text.trim();
-            // If field name contains "email", preserve original case for field value
-            if (capitalizedFieldName.toLowerCase().contains('email')) {
+
+            // Check if the value starts with http:// or https:// (case insensitive)
+            if (value.startsWith('http://') ||
+                value.startsWith('https://') ||
+                value.startsWith('HTTP://') ||
+                value.startsWith('HTTPS://')) {
+              // It's a URL, preserve original case
               return value;
-            } else {
-              return _capitalizeFirstLetter(value);
             }
+
+            // Check if field name contains "email"
+            final fieldNameLower = capitalizedFieldName.toLowerCase();
+            if (fieldNameLower.contains('email')) {
+              // It's an email field, preserve original case
+              return value;
+            }
+
+            // For all other values, capitalize first letter
+            return _capitalizeFirstLetter(value);
           })
           .where((value) => value.isNotEmpty)
           .toList();

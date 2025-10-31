@@ -84,6 +84,51 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
     }
   }
 
+  Future<void> duplicateRecord(
+      RecordModel record, int folderId, WidgetRef ref) async {
+    try {
+      final now = DateTime.now();
+
+      // Create a duplicate record with a modified field name
+      String duplicatedFieldName = record.fieldName;
+      int copyNumber = 1;
+
+      // Check if the field name already ends with " - Copy" or " - Copy (n)"
+      while (state.any((r) =>
+          r.fieldName == duplicatedFieldName && r.folderId == folderId)) {
+        if (copyNumber == 1) {
+          duplicatedFieldName = '${record.fieldName} - Copy';
+        } else {
+          duplicatedFieldName = '${record.fieldName} - Copy ($copyNumber)';
+        }
+        copyNumber++;
+      }
+
+      final duplicatedRecord = RecordModel(
+        fieldName: duplicatedFieldName,
+        fieldValues: List.from(record.fieldValues), // Create a copy of the list
+        folderId: folderId,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final id =
+          await _databaseHelper.insert('records', duplicatedRecord.toMap());
+      final newRecord = duplicatedRecord.copyWith(id: id);
+
+      final updatedList = [...state, newRecord];
+      // Sort alphabetically by field name
+      updatedList.sort((a, b) =>
+          a.fieldName.toLowerCase().compareTo(b.fieldName.toLowerCase()));
+      state = updatedList;
+
+      // Update folder record count
+      await _updateFolderRecordCount(folderId, ref);
+    } catch (e) {
+      debugPrint('Error duplicating record: $e');
+    }
+  }
+
   Future<void> _updateFolderRecordCount(int folderId, WidgetRef ref) async {
     try {
       final List<Map<String, dynamic>> countResult = await _databaseHelper

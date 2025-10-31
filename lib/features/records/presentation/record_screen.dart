@@ -279,6 +279,17 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                 ),
               ),
               const PopupMenuItem(
+                value: 'duplicate',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.content_copy, size: 18),
+                    SizedBox(width: 8),
+                    Text('Duplicate'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -318,10 +329,27 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
           ),
         );
         break;
+      case 'duplicate':
+        _duplicateRecord(context, record);
+        break;
       case 'delete':
         _showDeleteConfirmationDialog(context, record);
         break;
     }
+  }
+
+  void _duplicateRecord(BuildContext context, RecordModel record) {
+    ref.read(recordProvider.notifier).duplicateRecord(
+          record,
+          widget.folder.id!,
+          ref,
+        );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Record "${record.fieldName}" duplicated successfully'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _showDeleteConfirmationDialog(BuildContext context, RecordModel record) {
