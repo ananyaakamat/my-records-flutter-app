@@ -212,7 +212,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       body: Column(
         children: [
-          _buildSearchSection(context),
+          // Show search section only when there are more than one folder
+          if (folders.length > 1) _buildSearchSection(context),
           Expanded(
             child: _buildMainContent(context, folders, ref),
           ),
@@ -352,33 +353,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildNoResultsState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off,
-              size: 80,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No records found',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try searching for different keywords or check other folders',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+    return SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.of(context).size.height * 0.3,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 80,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'No records found',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try searching for different keywords or check other folders',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -507,39 +513,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.folder_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No folders yet',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create your first folder to organize your records',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => _showCreateFolderDialog(context, ref),
-              icon: const Icon(Icons.add),
-              label: const Text('Create Folder'),
-            ),
-          ],
+    return SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.of(context).size.height * 0.3,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.folder_outlined,
+                size: 80,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'No folders yet',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Create your first folder to organize your records',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () => _showCreateFolderDialog(context, ref),
+                icon: const Icon(Icons.add),
+                label: const Text('Create Folder'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -898,49 +909,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Help'),
+        title: const Text('Help - Folder Management'),
         content: const SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'My Records - Folder Management',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                'Folder Operations',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
-              SizedBox(height: 16),
-              Text('Folder Operations:'),
-              SizedBox(height: 8),
+              SizedBox(height: 12),
               Text('• Tap the + button to create new folders'),
-              SizedBox(height: 4),
-              Text('• Tap on a folder to view its contents'),
-              SizedBox(height: 4),
+              SizedBox(height: 6),
+              Text('• Tap any folder to view its records'),
+              SizedBox(height: 6),
               Text('• Use the menu (⋮) to edit, duplicate, or delete folders'),
-              SizedBox(height: 4),
-              Text('• Drag folders to reorder them'),
-              SizedBox(height: 12),
-              Text('Search & Navigation:'),
-              SizedBox(height: 8),
-              Text('• Use the search bar to find records across all folders'),
-              SizedBox(height: 4),
-              Text('• Filter search results by specific folders'),
-              SizedBox(height: 12),
-              Text('Management Options:'),
-              SizedBox(height: 8),
-              Text('• Toggle between light and dark themes'),
-              SizedBox(height: 4),
-              Text('• Use Delete All (⊙) to remove all folders and records'),
-              SizedBox(height: 4),
-              Text('• Access Settings for PIN changes and backup options'),
-              SizedBox(height: 12),
-              Text('Security & Backup:'),
-              SizedBox(height: 8),
-              Text('• Automatic daily backups save your data to Downloads'),
-              SizedBox(height: 4),
-              Text('• Change backup frequency in Settings > Backup & Restore'),
-              SizedBox(height: 4),
+              SizedBox(height: 6),
+              Text('• Drag folders by the handle (☰) to reorder them'),
+              SizedBox(height: 6),
+              Text('• Each folder shows its record count and description'),
+              SizedBox(height: 18),
               Text(
-                  '• Your data is secured with PIN and biometric authentication'),
+                'Global Search & Navigation',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text('• Search bar appears when you have 2+ folders'),
+              SizedBox(height: 6),
+              Text('• Search finds records across all folders instantly'),
+              SizedBox(height: 6),
+              Text('• Filter results by specific folders using dropdown'),
+              SizedBox(height: 6),
+              Text('• Tap search results to jump directly to that record'),
+              SizedBox(height: 6),
+              Text('• Records are highlighted when opened from search'),
+              SizedBox(height: 6),
+              Text('• Clear search anytime using the X button'),
+              SizedBox(height: 18),
+              Text(
+                'Folder Customization',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text('• Choose from various icons and colors when creating'),
+              SizedBox(height: 6),
+              Text('• Add optional descriptions for better organization'),
+              SizedBox(height: 6),
+              Text('• Edit existing folders to update name, icon, or color'),
+              SizedBox(height: 6),
+              Text('• Duplicate folders to quickly create similar ones'),
+              SizedBox(height: 6),
+              Text('• Custom sort order maintained through drag & drop'),
+              SizedBox(height: 18),
+              Text(
+                'Bulk Management',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text('• Delete All (🗑️) removes all folders and records'),
+              SizedBox(height: 6),
+              Text('• Confirmation dialog shows exact counts before deletion'),
+              SizedBox(height: 6),
+              Text('• Individual folder deletion preserves other data'),
+              SizedBox(height: 6),
+              Text('• Undo is not available - deletions are permanent'),
+              SizedBox(height: 18),
+              Text(
+                'Settings & Security',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text('• Toggle between light and dark themes instantly'),
+              SizedBox(height: 6),
+              Text('• Change PIN from Settings for enhanced security'),
+              SizedBox(height: 6),
+              Text('• Access Backup & Restore for data management'),
+              SizedBox(height: 6),
+              Text('• Automatic daily backups save to Downloads folder'),
+              SizedBox(height: 6),
+              Text('• PIN and biometric authentication protect your data'),
+              SizedBox(height: 18),
+              Text(
+                'Visual Indicators',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text('• Folder cards show custom icons and colors'),
+              SizedBox(height: 6),
+              Text('• Record counts update in real-time'),
+              SizedBox(height: 6),
+              Text('• Empty folders show helpful onboarding messages'),
+              SizedBox(height: 6),
+              Text('• Drag handles (☰) indicate reorderable items'),
+              SizedBox(height: 6),
+              Text('• Search results highlight matched content'),
             ],
           ),
         ),

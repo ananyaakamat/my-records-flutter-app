@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,8 +25,11 @@ class RecordScreen extends ConsumerStatefulWidget {
 
 class _RecordScreenState extends ConsumerState<RecordScreen> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   String? _highlightedRecordId;
   static String? _lastProcessedRecordId;
+  String _searchQuery = '';
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -33,6 +37,28 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     debugPrint(
         'DEBUG: initState called with highlightRecordId: ${widget.highlightRecordId}');
     _highlightedRecordId = widget.highlightRecordId;
+
+    // Ensure search is cleared on screen initialization
+    _searchQuery = '';
+    _searchController.clear();
+
+    // Set up search listener with debounce
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+
+      // Cancel previous timer
+      _debounceTimer?.cancel();
+
+      // Start new timer with 300ms delay for faster response
+      _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+        // Trigger rebuild with filtered results
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    });
 
     // Load records for this folder when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -291,8 +317,42 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    // Clear search when navigating away to reset for next visit
+    _searchController.clear();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  List<RecordModel> _getFilteredRecords(List<RecordModel> allRecords) {
+    // Filter records by current folder
+    var records = allRecords
+        .where((record) => record.folderId == widget.folder.id)
+        .toList();
+
+    // Apply search filter if search query is not empty
+    if (_searchQuery.isNotEmpty) {
+      records = records.where((record) {
+        // Search in field name
+        if (record.fieldName
+            .toLowerCase()
+            .contains(_searchQuery.toLowerCase())) {
+          return true;
+        }
+
+        // Search in field values
+        for (final value in record.fieldValues) {
+          if (value.toLowerCase().contains(_searchQuery.toLowerCase())) {
+            return true;
+          }
+        }
+
+        return false;
+      }).toList();
+    }
+
+    return records;
   }
 
   @override
@@ -300,10 +360,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     debugPrint(
         'DEBUG: build() called - _isScrolling: $_isScrolling, widget.highlightRecordId: ${widget.highlightRecordId}');
     final allRecords = ref.watch(recordProvider);
-    // Filter records by current folder
-    final records = allRecords
+    // Get unfiltered records count for search visibility check
+    final unfilteredRecords = allRecords
         .where((record) => record.folderId == widget.folder.id)
         .toList();
+    final records = _getFilteredRecords(allRecords);
     final themeMode = ref.watch(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
 
@@ -351,9 +412,17 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
           ),
         ],
       ),
-      body: records.isEmpty
-          ? _buildEmptyState(context)
-          : _buildRecordsList(context, records),
+      body: Column(
+        children: [
+          // Show search section only when there are more than one record
+          if (unfilteredRecords.length > 1) _buildSearchSection(context),
+          Expanded(
+            child: records.isEmpty
+                ? _buildEmptyState(context)
+                : _buildRecordsList(context, records),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddRecordDialog(context),
         tooltip: 'Add New Record',
@@ -362,40 +431,77 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     );
   }
 
+  Widget _buildSearchSection(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search records...',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _debounceTimer?.cancel();
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surface,
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              widget.folder.icon,
-              size: 80,
-              color: widget.folder.color.withOpacity(0.5),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No records yet',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add your first record to start organizing your data',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => _showAddRecordDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Record'),
-            ),
-          ],
+    return SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.of(context).size.height * 0.3,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                widget.folder.icon,
+                size: 80,
+                color: widget.folder.color.withOpacity(0.5),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                _searchQuery.isNotEmpty ? 'No records found' : 'No records yet',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _searchQuery.isNotEmpty
+                    ? 'Try searching for different keywords in this folder'
+                    : 'Add your first record to start organizing your data',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () => _showAddRecordDialog(context),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Record'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -807,67 +913,94 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Help'),
+        title: const Text('Help - Record Management'),
         content: const SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'My Records - Record Management',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                'Record Operations',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
-              SizedBox(height: 16),
-              Text('• Tap the + button to create new records'),
-              SizedBox(height: 8),
-              Text('• Tap on any record to display its detailed information'),
-              SizedBox(height: 8),
+              SizedBox(height: 12),
+              Text('• Tap the + button to add new records'),
+              SizedBox(height: 6),
+              Text('• Tap any record to view detailed information'),
+              SizedBox(height: 6),
               Text('• Use the menu (⋮) to edit, duplicate, or delete records'),
-              SizedBox(height: 8),
-              Text('• Records are sorted alphabetically by field name'),
-              SizedBox(height: 8),
-              Text('• Each record can have multiple field values'),
-              SizedBox(height: 8),
-              Text('• Long press on text to copy to clipboard'),
-              SizedBox(height: 16),
+              SizedBox(height: 6),
+              Text('• Each record can store multiple field values'),
+              SizedBox(height: 6),
+              Text('• Long press on text in details view to copy to clipboard'),
+              SizedBox(height: 18),
+              Text(
+                'Search & Navigation',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text('• Search bar appears when folder has more than 1 record'),
+              SizedBox(height: 6),
+              Text('• Search works across field names and values'),
+              SizedBox(height: 6),
+              Text('• Search results update in real-time as you type'),
+              SizedBox(height: 6),
+              Text('• Clear search using the X button or by navigating away'),
+              SizedBox(height: 6),
+              Text('• Records from global search are highlighted when opened'),
+              SizedBox(height: 18),
               Text(
                 'Record Duplication',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
-              SizedBox(height: 8),
+              SizedBox(height: 12),
+              Text('• Single folder: Records duplicate within the same folder'),
+              SizedBox(height: 6),
+              Text('• Multiple folders: Choose destination from dropdown'),
+              SizedBox(height: 6),
+              Text('• Smart naming: "Name", "Name - Copy", "Name - Copy (2)"'),
+              SizedBox(height: 6),
+              Text('• Maintains consistent numbering for duplicates'),
+              SizedBox(height: 18),
               Text(
-                  '• Single folder: Records duplicate directly in the same folder'),
-              SizedBox(height: 4),
-              Text('• Multiple folders: Choose target folder from dropdown'),
-              SizedBox(height: 4),
-              Text(
-                  '• Naming pattern: "Name", "Name - Copy", "Name - Copy (2)", etc.'),
-              SizedBox(height: 4),
-              Text(
-                  '• Duplicates maintain the base name for consistent numbering'),
-              SizedBox(height: 16),
-              Text(
-                'Date Format Support',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                'Smart Date Recognition',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
-              SizedBox(height: 8),
-              Text(
-                  'When entering dates in Field Value, these formats are automatically recognized:'),
+              SizedBox(height: 12),
+              Text('Automatically detects dates in these formats:'),
               SizedBox(height: 8),
               Text('• Numeric: 25/07/2025, 4/3/24, 15-12-2023'),
               SizedBox(height: 4),
-              Text('• With month names: 4 Mar 2025, 03 April 24'),
+              Text('• Named months: 4 Mar 2025, 03 April 24'),
               SizedBox(height: 4),
               Text('• US format: March 4, 2025, Apr 03, 24'),
               SizedBox(height: 4),
               Text('• With hyphens: 4-Mar-2025, 15-Dec-23'),
               SizedBox(height: 4),
-              Text('• Concatenated: 4March23, 15mar2025, 4Mar2023'),
+              Text('• Compact: 4March23, 15mar2025, 4Mar2023'),
               SizedBox(height: 4),
-              Text('• With day names: Mon 4 Mar 2025, Sat 03 April 24'),
+              Text('• With days: Mon 4 Mar 2025, Sat 03 April 24'),
               SizedBox(height: 8),
+              Text('✓ Past dates show calculated age'),
+              SizedBox(height: 4),
+              Text('✓ Future dates show time until expiry'),
+              SizedBox(height: 4),
+              Text('✓ Today\'s dates show as "Expired"'),
+              SizedBox(height: 18),
               Text(
-                  'The app will automatically calculate age for birth dates or show expiry status for future dates.'),
+                'Visual Features',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text('• Records are sorted by creation date (newest first)'),
+              SizedBox(height: 6),
+              Text('• Highlighted records have enhanced borders and shadows'),
+              SizedBox(height: 6),
+              Text('• Empty folders show helpful onboarding messages'),
+              SizedBox(height: 6),
+              Text('• Search results show contextual empty states'),
+              SizedBox(height: 6),
+              Text('• Dark/light theme support with consistent styling'),
             ],
           ),
         ),

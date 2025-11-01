@@ -18,6 +18,8 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _confirmPinController = TextEditingController();
+  final FocusNode _pinFocusNode = FocusNode();
+  final FocusNode _confirmPinFocusNode = FocusNode();
 
   int _currentPage = 0;
   bool _isLoading = false;
@@ -123,6 +125,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           _errorMessage = 'Please enter a PIN';
         });
       }
+      _pinFocusNode.requestFocus();
       return;
     }
 
@@ -132,6 +135,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           _errorMessage = 'PIN must be exactly 6 digits';
         });
       }
+      _pinFocusNode.requestFocus();
       return;
     }
 
@@ -141,6 +145,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           _errorMessage = 'Please confirm your PIN';
         });
       }
+      _confirmPinFocusNode.requestFocus();
       return;
     }
 
@@ -150,6 +155,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
           _errorMessage = 'PINs do not match';
         });
       }
+      _confirmPinFocusNode.requestFocus();
       return;
     }
 
@@ -214,6 +220,15 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                         _currentPage = page;
                         _errorMessage = '';
                       });
+
+                      // Auto-focus on Enter PIN field when PIN setup page is displayed
+                      if (page == 1) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted && !_setupCompleted) {
+                            _pinFocusNode.requestFocus();
+                          }
+                        });
+                      }
                     }
                   },
                   children: [
@@ -401,6 +416,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
             // PIN Input
             TextField(
               controller: _pinController,
+              focusNode: _pinFocusNode,
               obscureText: true,
               keyboardType: TextInputType.number,
               maxLength: 6,
@@ -410,6 +426,12 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
                 fontWeight: FontWeight.bold,
                 letterSpacing: 8,
               ),
+              onChanged: (value) {
+                // Auto-focus on Confirm PIN field when Enter PIN is complete
+                if (value.length == 6) {
+                  _confirmPinFocusNode.requestFocus();
+                }
+              },
               decoration: InputDecoration(
                 labelText: 'Enter PIN',
                 hintText: '• • • • • •',
@@ -428,6 +450,7 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
             // Confirm PIN Input
             TextField(
               controller: _confirmPinController,
+              focusNode: _confirmPinFocusNode,
               obscureText: true,
               keyboardType: TextInputType.number,
               maxLength: 6,
@@ -580,6 +603,8 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
     _pageController.dispose();
     _pinController.dispose();
     _confirmPinController.dispose();
+    _pinFocusNode.dispose();
+    _confirmPinFocusNode.dispose();
     super.dispose();
   }
 }
