@@ -27,14 +27,14 @@ class _DuplicateRecordDialogState extends ConsumerState<DuplicateRecordDialog> {
   void initState() {
     super.initState();
     _selectedFolderId = widget.currentFolderId;
-    print(
+    debugPrint(
         'DEBUG: DuplicateRecordDialog initialized with folderId: ${widget.currentFolderId}');
   }
 
   @override
   Widget build(BuildContext context) {
     final folders = ref.watch(folderProvider);
-    print('DEBUG: Dialog build - total folders: ${folders.length}');
+    debugPrint('DEBUG: Dialog build - total folders: ${folders.length}');
 
     // Sort folders alphabetically by name
     final sortedFolders = List<FolderModel>.from(folders);

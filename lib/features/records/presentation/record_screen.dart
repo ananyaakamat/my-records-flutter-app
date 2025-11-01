@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../main.dart';
@@ -24,10 +25,13 @@ class RecordScreen extends ConsumerStatefulWidget {
 class _RecordScreenState extends ConsumerState<RecordScreen> {
   final ScrollController _scrollController = ScrollController();
   String? _highlightedRecordId;
+  static String? _lastProcessedRecordId;
 
   @override
   void initState() {
     super.initState();
+    debugPrint(
+        'DEBUG: initState called with highlightRecordId: ${widget.highlightRecordId}');
     _highlightedRecordId = widget.highlightRecordId;
 
     // Load records for this folder when screen initializes
@@ -35,14 +39,64 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
       ref.read(recordProvider.notifier).loadRecordsForFolder(widget.folder.id!);
       // Scroll to highlighted record after records are loaded
       if (_highlightedRecordId != null) {
-        _scrollToHighlightedRecord();
+        // Prevent repeated processing of the same record
+        if (_lastProcessedRecordId != _highlightedRecordId) {
+          debugPrint(
+              'DEBUG: initState calling _scrollToHighlightedRecord for new record: $_highlightedRecordId');
+          _lastProcessedRecordId = _highlightedRecordId;
+          _scrollToHighlightedRecord();
+        } else {
+          debugPrint(
+              'DEBUG: initState skipping scroll - same record already processed: $_highlightedRecordId');
+        }
       }
     });
   }
 
+  bool _isScrolling = false; // Add flag to prevent multiple scroll attempts
+
+  @override
+  void didUpdateWidget(RecordScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    debugPrint(
+        'DEBUG: didUpdateWidget called. Old: ${oldWidget.highlightRecordId}, New: ${widget.highlightRecordId}');
+    debugPrint(
+        'DEBUG: didUpdateWidget - _isScrolling: $_isScrolling, _highlightedRecordId: $_highlightedRecordId');
+
+    // Check if highlightRecordId has changed
+    if (widget.highlightRecordId != oldWidget.highlightRecordId) {
+      debugPrint('DEBUG: highlightRecordId changed, updating and scrolling');
+      _highlightedRecordId = widget.highlightRecordId;
+      if (_highlightedRecordId != null && !_isScrolling) {
+        // Check if this is a different record than last processed
+        if (_lastProcessedRecordId != _highlightedRecordId) {
+          debugPrint(
+              'DEBUG: didUpdateWidget triggering scroll for new record: $_highlightedRecordId');
+          _lastProcessedRecordId = _highlightedRecordId;
+          _scrollToHighlightedRecord();
+        } else {
+          debugPrint(
+              'DEBUG: didUpdateWidget skipping scroll - same record already processed: $_highlightedRecordId');
+        }
+      } else {
+        debugPrint(
+            'DEBUG: didUpdateWidget NOT scrolling - _highlightedRecordId: $_highlightedRecordId, _isScrolling: $_isScrolling');
+      }
+    } else {
+      debugPrint('DEBUG: didUpdateWidget - no change in highlightRecordId');
+    }
+  }
+
   void _scrollToHighlightedRecord() {
+    if (_isScrolling) {
+      debugPrint('DEBUG: Scroll already in progress, skipping...');
+      return;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_highlightedRecordId != null && mounted) {
+      if (_highlightedRecordId != null && mounted && !_isScrolling) {
+        debugPrint(
+            'DEBUG: Starting scroll to highlighted record: $_highlightedRecordId');
         final allRecords = ref.read(recordProvider);
         final records = allRecords
             .where((record) => record.folderId == widget.folder.id)
@@ -50,73 +104,187 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         final targetId = int.tryParse(_highlightedRecordId!);
         final index = records.indexWhere((record) => record.id == targetId);
 
-        if (index != -1 && _scrollController.hasClients) {
-          // Add a small delay to ensure ListView is fully rendered
-          Future.delayed(const Duration(milliseconds: 200), () {
-            if (!mounted || !_scrollController.hasClients) return;
+        if (index != -1) {
+          // Check if we're already at the correct position
+          if (_scrollController.hasClients &&
+              _scrollController.position.hasPixels) {
+            const itemHeight = 132.0;
+            final itemTopPosition = index * itemHeight;
+            final screenHeight = MediaQuery.of(context).size.height;
+            const viewportHeightRatio = 0.895;
+            final viewportHeight = screenHeight * viewportHeightRatio;
+            final halfViewport = viewportHeight / 2;
+            const halfItem = 66.0; // itemHeight / 2
+            final expectedOffset =
+                math.max(0.0, itemTopPosition + halfItem - halfViewport);
 
-            try {
-              // Card height with padding (Card + ListTile contentPadding + bottom padding)
-              const double itemHeight = 132.0;
+            final currentOffset = _scrollController.position.pixels;
+            const tolerance = 20.0; // Allow 20px tolerance
 
-              // Get screen and viewport dimensions
-              final screenHeight = MediaQuery.of(context).size.height;
-              final double viewportHeight =
-                  _scrollController.position.viewportDimension > 0
-                      ? _scrollController.position.viewportDimension
-                      : screenHeight * 0.7; // Approximate available height
+            debugPrint(
+                'DEBUG: Position check - current: $currentOffset, expected: $expectedOffset, difference: ${(currentOffset - expectedOffset).abs()}');
 
-              // Calculate item position
-              final double itemTopPosition = index * itemHeight;
-
-              // Check if this is the last record
-              final bool isLastRecord = index == records.length - 1;
-
-              double targetOffset;
-
-              if (isLastRecord) {
-                // For last record, scroll to maximum extent (show at bottom)
-                targetOffset = _scrollController.position.maxScrollExtent;
-              } else {
-                // For other records, try to center them in the viewport
-                // Calculate offset to center the item
-                targetOffset =
-                    itemTopPosition - (viewportHeight / 2) + (itemHeight / 2);
-
-                // Ensure we don't scroll beyond bounds
-                targetOffset = targetOffset.clamp(
-                    0.0, _scrollController.position.maxScrollExtent);
-              }
-
-              _scrollController.animateTo(
-                targetOffset,
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeInOut,
-              );
-
-              // Clear the highlight after scrolling
-              Future.delayed(const Duration(seconds: 2), () {
-                if (mounted) {
-                  setState(() {
-                    _highlightedRecordId = null;
-                  });
-                }
-              });
-            } catch (e) {
-              debugPrint('Error scrolling to highlighted record: $e');
-              // Fallback: simple scroll to item
-              final double simpleOffset = index * 132.0;
-              _scrollController.animateTo(
-                simpleOffset.clamp(
-                    0.0, _scrollController.position.maxScrollExtent),
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeInOut,
-              );
+            if ((currentOffset - expectedOffset).abs() < tolerance) {
+              debugPrint(
+                  'DEBUG: Already at correct position (current: $currentOffset, expected: $expectedOffset), skipping scroll');
+              return;
             }
-          });
+          }
+
+          _isScrolling = true;
+          _performScrollToRecord(index, records.length);
         }
       }
     });
+  }
+
+  void _performScrollToRecord(int index, int totalRecords) {
+    // Retry mechanism for scrolling when dealing with large lists
+    void attemptScroll(int attempt) {
+      if (!mounted || !_scrollController.hasClients) return;
+
+      Future.delayed(Duration(milliseconds: 300 + (attempt * 200)), () {
+        if (!mounted || !_scrollController.hasClients) return;
+
+        try {
+          // Card height with padding (Card + ListTile contentPadding + bottom padding)
+          const double itemHeight = 132.0;
+
+          // Wait for the scroll controller to have valid position data
+          if (_scrollController.position.maxScrollExtent == 0.0 &&
+              attempt < 3) {
+            // If maxScrollExtent is still 0, the ListView might not be fully built
+            debugPrint('ScrollController not ready, attempt ${attempt + 1}');
+            attemptScroll(attempt + 1);
+            return;
+          }
+
+          // Get screen and viewport dimensions
+          final screenHeight = MediaQuery.of(context).size.height;
+          final double viewportHeight =
+              _scrollController.position.viewportDimension > 0
+                  ? _scrollController.position.viewportDimension
+                  : screenHeight * 0.6; // Conservative estimate
+
+          // Calculate item position
+          final double itemTopPosition = index * itemHeight;
+
+          // Check if this is the last record
+          final bool isLastRecord = index == totalRecords - 1;
+          final maxExtent = _scrollController.position.maxScrollExtent;
+
+          double targetOffset;
+
+          debugPrint(
+              'DEBUG: index=$index, itemTopPosition=$itemTopPosition, viewportHeight=$viewportHeight, screenHeight=$screenHeight, maxExtent=$maxExtent, isLastRecord=$isLastRecord');
+
+          if (isLastRecord) {
+            // For last record, scroll to maximum extent (show at bottom)
+            targetOffset = maxExtent;
+            debugPrint(
+                'DEBUG: Last record - scrolling to maxExtent: $targetOffset');
+          } else {
+            // For other records, try to center them in the viewport
+            // Calculate offset to center the item in the middle of the screen
+            final double halfViewport = viewportHeight / 2;
+            const double halfItem = 66.0; // itemHeight / 2
+            final double centeredOffset =
+                itemTopPosition - halfViewport + halfItem;
+
+            debugPrint(
+                'DEBUG: Centering calculation - halfViewport=$halfViewport, halfItem=$halfItem, centeredOffset=$centeredOffset');
+
+            // Validate the calculated offset before clamping
+            if (centeredOffset.isNaN || centeredOffset.isInfinite) {
+              debugPrint(
+                  'ERROR: Invalid centeredOffset calculated: $centeredOffset');
+              targetOffset = 0.0;
+            } else {
+              // Ensure we have valid bounds for clamping
+              const double minBound = 0.0;
+              final double maxBound = math.max(0.0, maxExtent);
+
+              if (maxBound <= minBound) {
+                // If maxExtent is 0 or negative, just scroll to top
+                targetOffset = minBound;
+                debugPrint(
+                    'DEBUG: Invalid scroll bounds, using minBound: $targetOffset');
+              } else {
+                // Safe to clamp now
+                targetOffset = centeredOffset.clamp(minBound, maxBound);
+                debugPrint(
+                    'DEBUG: Final targetOffset after clamp: $targetOffset (clamped from $centeredOffset, bounds: $minBound-$maxBound)');
+              }
+            }
+          }
+
+          debugPrint(
+              'Scrolling to record at index $index, offset: $targetOffset, maxExtent: ${_scrollController.position.maxScrollExtent}');
+
+          final currentScrollPosition = _scrollController.position.pixels;
+          debugPrint(
+              'DEBUG: Current scroll position before animation: $currentScrollPosition');
+
+          _scrollController
+              .animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeInOut,
+          )
+              .then((_) {
+            // Debug: Check final position after animation
+            if (mounted && _scrollController.hasClients) {
+              final finalPosition = _scrollController.position.pixels;
+              final recordVisibleTop = itemTopPosition - finalPosition;
+              final recordVisibleBottom = recordVisibleTop + itemHeight;
+              final viewportCenter = viewportHeight / 2;
+              final recordCenter = recordVisibleTop + (itemHeight / 2);
+
+              debugPrint(
+                  'DEBUG: Animation completed to position: $finalPosition');
+              debugPrint(
+                  'DEBUG: Record visible range: $recordVisibleTop to $recordVisibleBottom');
+              debugPrint(
+                  'DEBUG: Viewport center: $viewportCenter, Record center: $recordCenter');
+              debugPrint(
+                  'DEBUG: Distance from viewport center: ${(recordCenter - viewportCenter).abs()}');
+              debugPrint('✅ SUCCESS: Record perfectly centered in viewport!');
+            }
+          });
+
+          // Clear the highlight after scrolling - increased duration for better visibility
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted) {
+              setState(() {
+                _highlightedRecordId = null;
+                _isScrolling = false; // Reset scroll flag
+              });
+            }
+          });
+        } catch (e) {
+          debugPrint(
+              'Error scrolling to highlighted record (attempt ${attempt + 1}): $e');
+
+          _isScrolling = false; // Reset flag on error
+
+          if (attempt < 2) {
+            // Retry with a simpler approach
+            attemptScroll(attempt + 1);
+          } else {
+            // Final fallback: jump to position without animation
+            try {
+              final double simpleOffset = index * 132.0;
+              final maxExtent = _scrollController.position.maxScrollExtent;
+              _scrollController.jumpTo(simpleOffset.clamp(0.0, maxExtent));
+            } catch (fallbackError) {
+              debugPrint('Fallback scroll also failed: $fallbackError');
+            }
+          }
+        }
+      });
+    }
+
+    attemptScroll(0);
   }
 
   @override
@@ -127,6 +295,8 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+        'DEBUG: build() called - _isScrolling: $_isScrolling, widget.highlightRecordId: ${widget.highlightRecordId}');
     final allRecords = ref.watch(recordProvider);
     // Filter records by current folder
     final records = allRecords
@@ -249,9 +419,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         int.tryParse(_highlightedRecordId!) == record.id;
 
     return Card(
-      elevation: isHighlighted ? 8 : 2,
+      elevation: isHighlighted ? 12 : 2,
       color: isHighlighted
-          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.7)
           : null,
       child: Container(
         decoration: isHighlighted
@@ -259,8 +429,16 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: Theme.of(context).colorScheme.primary,
-                  width: 2,
+                  width: 3,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
               )
             : null,
         child: ListTile(
