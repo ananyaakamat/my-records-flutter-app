@@ -43,23 +43,75 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   void _scrollToHighlightedRecord() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_highlightedRecordId != null && mounted) {
-        final records = ref.read(recordProvider);
+        final allRecords = ref.read(recordProvider);
+        final records = allRecords
+            .where((record) => record.folderId == widget.folder.id)
+            .toList();
         final targetId = int.tryParse(_highlightedRecordId!);
         final index = records.indexWhere((record) => record.id == targetId);
+
         if (index != -1 && _scrollController.hasClients) {
-          // Calculate scroll position (assuming each card is approximately 120 pixels high with padding)
-          final double targetOffset = index * 132.0; // Card height + padding
-          _scrollController.animateTo(
-            targetOffset,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
-          // Clear the highlight after scrolling
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              setState(() {
-                _highlightedRecordId = null;
+          // Add a small delay to ensure ListView is fully rendered
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (!mounted || !_scrollController.hasClients) return;
+
+            try {
+              // Card height with padding (Card + ListTile contentPadding + bottom padding)
+              const double itemHeight = 132.0;
+
+              // Get screen and viewport dimensions
+              final screenHeight = MediaQuery.of(context).size.height;
+              final double viewportHeight =
+                  _scrollController.position.viewportDimension > 0
+                      ? _scrollController.position.viewportDimension
+                      : screenHeight * 0.7; // Approximate available height
+
+              // Calculate item position
+              final double itemTopPosition = index * itemHeight;
+
+              // Check if this is the last record
+              final bool isLastRecord = index == records.length - 1;
+
+              double targetOffset;
+
+              if (isLastRecord) {
+                // For last record, scroll to maximum extent (show at bottom)
+                targetOffset = _scrollController.position.maxScrollExtent;
+              } else {
+                // For other records, try to center them in the viewport
+                // Calculate offset to center the item
+                targetOffset =
+                    itemTopPosition - (viewportHeight / 2) + (itemHeight / 2);
+
+                // Ensure we don't scroll beyond bounds
+                targetOffset = targetOffset.clamp(
+                    0.0, _scrollController.position.maxScrollExtent);
+              }
+
+              _scrollController.animateTo(
+                targetOffset,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+              );
+
+              // Clear the highlight after scrolling
+              Future.delayed(const Duration(seconds: 2), () {
+                if (mounted) {
+                  setState(() {
+                    _highlightedRecordId = null;
+                  });
+                }
               });
+            } catch (e) {
+              debugPrint('Error scrolling to highlighted record: $e');
+              // Fallback: simple scroll to item
+              final double simpleOffset = index * 132.0;
+              _scrollController.animateTo(
+                simpleOffset.clamp(
+                    0.0, _scrollController.position.maxScrollExtent),
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+              );
             }
           });
         }
