@@ -89,20 +89,27 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
     try {
       final now = DateTime.now();
 
-      // Create a duplicate record with a modified field name
-      String duplicatedFieldName = record.fieldName;
-      int copyNumber = 1;
+      // Extract the base name (remove existing " - Copy" or " - Copy (n)" suffixes)
+      String baseName = _extractBaseName(record.fieldName);
+      debugPrint(
+          'DUPLICATE DEBUG: Original name: "${record.fieldName}", Base name: "$baseName"');
 
-      // Check if the field name already ends with " - Copy" or " - Copy (n)"
-      while (state.any((r) =>
-          r.fieldName == duplicatedFieldName && r.folderId == folderId)) {
-        if (copyNumber == 1) {
-          duplicatedFieldName = '${record.fieldName} - Copy';
-        } else {
-          duplicatedFieldName = '${record.fieldName} - Copy ($copyNumber)';
-        }
-        copyNumber++;
-      }
+      // Get all existing records in the target folder from database (not from state)
+      final List<Map<String, dynamic>> existingMaps =
+          await _databaseHelper.query(
+        'records',
+        where: 'folder_id = ?',
+        whereArgs: [folderId],
+      );
+      final existingRecordsInFolder =
+          existingMaps.map((map) => RecordModel.fromMap(map)).toList();
+      debugPrint(
+          'DUPLICATE DEBUG: Existing records in target folder: ${existingRecordsInFolder.map((r) => r.fieldName).toList()}');
+
+      // Generate a unique name for the duplicate
+      String duplicatedFieldName =
+          _generateUniqueCopyName(baseName, existingRecordsInFolder);
+      debugPrint('DUPLICATE DEBUG: Generated name: "$duplicatedFieldName"');
 
       final duplicatedRecord = RecordModel(
         fieldName: duplicatedFieldName,
@@ -126,6 +133,48 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
       await _updateFolderRecordCount(folderId, ref);
     } catch (e) {
       debugPrint('Error duplicating record: $e');
+    }
+  }
+
+  /// Extracts the base name from a field name by removing " - Copy" or " - Copy (n)" suffixes
+  String _extractBaseName(String fieldName) {
+    // Remove " - Copy (n)" pattern first
+    String baseName = fieldName.replaceAll(RegExp(r' - Copy \(\d+\)$'), '');
+
+    // Remove " - Copy" pattern
+    if (baseName.endsWith(' - Copy')) {
+      baseName = baseName.substring(0, baseName.length - ' - Copy'.length);
+    }
+
+    return baseName;
+  }
+
+  /// Generates a unique copy name following the pattern: baseName, baseName - Copy, baseName - Copy (2), etc.
+  String _generateUniqueCopyName(
+      String baseName, List<RecordModel> existingRecords) {
+    // Create a set of existing names for faster lookup
+    final existingNames =
+        existingRecords.map((r) => r.fieldName.toLowerCase()).toSet();
+
+    // Check if the base name itself is available
+    if (!existingNames.contains(baseName.toLowerCase())) {
+      return baseName;
+    }
+
+    // Check "baseName - Copy"
+    String copyName = '$baseName - Copy';
+    if (!existingNames.contains(copyName.toLowerCase())) {
+      return copyName;
+    }
+
+    // Check "baseName - Copy (2)", "baseName - Copy (3)", etc.
+    int copyNumber = 2;
+    while (true) {
+      String numberedCopyName = '$baseName - Copy ($copyNumber)';
+      if (!existingNames.contains(numberedCopyName.toLowerCase())) {
+        return numberedCopyName;
+      }
+      copyNumber++;
     }
   }
 

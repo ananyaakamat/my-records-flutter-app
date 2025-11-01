@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../main.dart';
 import '../../folders/domain/folder_model.dart';
+import '../../folders/providers/folder_provider.dart';
 import '../domain/record_model.dart';
 import '../providers/record_provider.dart';
 import 'add_record_dialog.dart';
@@ -74,7 +75,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final records = ref.watch(recordProvider);
+    final allRecords = ref.watch(recordProvider);
+    // Filter records by current folder
+    final records = allRecords
+        .where((record) => record.folderId == widget.folder.id)
+        .toList();
     final themeMode = ref.watch(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
 
@@ -339,16 +344,100 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   }
 
   void _duplicateRecord(BuildContext context, RecordModel record) {
-    ref.read(recordProvider.notifier).duplicateRecord(
-          record,
-          widget.folder.id!,
-          ref,
+    final folderCount = ref.read(folderCountProvider);
+
+    if (folderCount <= 1) {
+      // If only one folder exists, duplicate directly to the current folder
+      ref.read(recordProvider.notifier).duplicateRecord(
+            record,
+            widget.folder.id!,
+            ref,
+          );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Record "${record.fieldName}" duplicated successfully'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      // If multiple folders exist, show the folder selection dialog
+      _showDuplicateDialog(context, record);
+    }
+  }
+
+  void _showDuplicateDialog(BuildContext context, RecordModel record) {
+    final folders = ref.read(folderProvider);
+    int? selectedFolderId = widget.folder.id!;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Duplicate Record'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Duplicate "${record.fieldName}" to:'),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    value: selectedFolderId,
+                    decoration: const InputDecoration(
+                      labelText: 'Select Folder',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: folders.map((folder) {
+                      return DropdownMenuItem<int>(
+                        value: folder.id,
+                        child: Text(folder.name),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedFolderId = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    if (selectedFolderId != null) {
+                      ref.read(recordProvider.notifier).duplicateRecord(
+                            record,
+                            selectedFolderId!,
+                            ref,
+                          );
+                      // Show appropriate success message
+                      final selectedFolder =
+                          folders.firstWhere((f) => f.id == selectedFolderId);
+                      final message = selectedFolderId == widget.folder.id
+                          ? 'Record "${record.fieldName}" duplicated successfully'
+                          : 'Record "${record.fieldName}" duplicated to "${selectedFolder.name}"';
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(message),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
         );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Record "${record.fieldName}" duplicated successfully'),
-        duration: const Duration(seconds: 2),
-      ),
+      },
     );
   }
 
@@ -501,13 +590,29 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
               SizedBox(height: 8),
               Text('• Tap on any record to display its detailed information'),
               SizedBox(height: 8),
-              Text('• Use the menu (⋮) to edit or delete records'),
+              Text('• Use the menu (⋮) to edit, duplicate, or delete records'),
               SizedBox(height: 8),
               Text('• Records are sorted alphabetically by field name'),
               SizedBox(height: 8),
               Text('• Each record can have multiple field values'),
               SizedBox(height: 8),
               Text('• Long press on text to copy to clipboard'),
+              SizedBox(height: 16),
+              Text(
+                'Record Duplication',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                  '• Single folder: Records duplicate directly in the same folder'),
+              SizedBox(height: 4),
+              Text('• Multiple folders: Choose target folder from dropdown'),
+              SizedBox(height: 4),
+              Text(
+                  '• Naming pattern: "Name", "Name - Copy", "Name - Copy (2)", etc.'),
+              SizedBox(height: 4),
+              Text(
+                  '• Duplicates maintain the base name for consistent numbering'),
               SizedBox(height: 16),
               Text(
                 'Date Format Support',
