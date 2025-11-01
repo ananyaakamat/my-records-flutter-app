@@ -188,11 +188,13 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
             // Calculate offset to center the item in the middle of the screen
             final double halfViewport = viewportHeight / 2;
             const double halfItem = 66.0; // itemHeight / 2
+            // Enhanced calculation: move record slightly above center for better visibility
+            const double visibilityOffset = 20.0; // Move 20px above center
             final double centeredOffset =
-                itemTopPosition - halfViewport + halfItem;
+                itemTopPosition - halfViewport + halfItem - visibilityOffset;
 
             debugPrint(
-                'DEBUG: Centering calculation - halfViewport=$halfViewport, halfItem=$halfItem, centeredOffset=$centeredOffset');
+                'DEBUG: Enhanced centering - halfViewport=$halfViewport, halfItem=$halfItem, centeredOffset=$centeredOffset (with 20px visibility offset)');
 
             // Validate the calculated offset before clamping
             if (centeredOffset.isNaN || centeredOffset.isInfinite) {
