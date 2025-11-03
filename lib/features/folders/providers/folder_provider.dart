@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/services/automatic_backup_service.dart';
 import '../domain/folder_model.dart';
 import '../../records/domain/record_model.dart';
 
@@ -10,6 +11,8 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
   }
 
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final AutomaticBackupService _automaticBackupService =
+      AutomaticBackupService.instance;
 
   Future<void> loadFolders() async {
     try {
@@ -41,6 +44,12 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
       final newFolder = folderToAdd.copyWith(id: id);
 
       state = [newFolder, ...state];
+
+      // Trigger automatic backup after folder creation
+      await _automaticBackupService.triggerFolderBackup(
+        operation: 'create',
+        folderName: newFolder.name,
+      );
     } catch (e) {
       debugPrint('Error adding folder: $e');
     }
@@ -63,6 +72,12 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
       final sortedFolders = List<FolderModel>.from(state);
       sortedFolders.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
       state = sortedFolders;
+
+      // Trigger automatic backup after folder update
+      await _automaticBackupService.triggerFolderBackup(
+        operation: 'update',
+        folderName: updatedFolder.name,
+      );
     } catch (e) {
       debugPrint('Error updating folder: $e');
     }
@@ -70,8 +85,17 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
 
   Future<void> deleteFolder(int folderId) async {
     try {
+      // Get folder name before deletion for logging
+      final folderToDelete = state.firstWhere((f) => f.id == folderId);
+
       await _databaseHelper.delete('folders', 'id = ?', [folderId]);
       state = state.where((folder) => folder.id != folderId).toList();
+
+      // Trigger automatic backup after folder deletion
+      await _automaticBackupService.triggerFolderBackup(
+        operation: 'delete',
+        folderName: folderToDelete.name,
+      );
     } catch (e) {
       debugPrint('Error deleting folder: $e');
     }
@@ -144,6 +168,12 @@ class FolderNotifier extends StateNotifier<List<FolderModel>> {
       final updatedList = [...state, finalFolder];
       updatedList.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
       state = updatedList;
+
+      // Trigger automatic backup after folder duplication
+      await _automaticBackupService.triggerFolderBackup(
+        operation: 'duplicate',
+        folderName: finalFolder.name,
+      );
     } catch (e) {
       debugPrint('Error duplicating folder: $e');
     }

@@ -11,6 +11,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
+
 import '../database/database_helper.dart'; // WorkManager callback for background backup task
 
 @pragma('vm:entry-point')
@@ -51,7 +52,7 @@ void callbackDispatcher() {
 
 class BackupService {
   static const String _backupFolderName = 'my_records';
-  static const int _maxBackupFiles = 3;
+
   static const String _autoBackupKey = 'auto_backup_enabled';
   static const String _autoBackupFrequencyKey = 'auto_backup_frequency';
   static const String _lastBackupKey = 'last_backup_timestamp';
@@ -209,7 +210,7 @@ class BackupService {
       final amPM = timestamp.hour >= 12 ? 'PM' : 'AM';
       final formattedDate =
           "${timestamp.day}${_getMonthName(timestamp.month)}${timestamp.year.toString().substring(2)}_${hour12.toString().padLeft(2, '0')}${timestamp.minute.toString().padLeft(2, '0')}$amPM";
-      final filename = 'my_records$formattedDate.enc';
+      final filename = 'my_records$formattedDate.db.enc';
 
       // Get backup folder
       final backupDir = await _createBackupFolder();
@@ -224,7 +225,7 @@ class BackupService {
       await file.writeAsString(jsonEncode(encryptedData));
 
       // Clean up old backups
-      await _cleanupOldBackupsInDirectory(backupDir);
+      await _cleanOldBackups(backupDir);
 
       // Update last backup timestamp
       final prefs = await SharedPreferences.getInstance();
@@ -337,7 +338,7 @@ class BackupService {
           .list()
           .where((entity) =>
               entity is File &&
-              entity.path.endsWith('.enc') &&
+              entity.path.endsWith('.db.enc') &&
               path.basename(entity.path).startsWith('my_records'))
           .cast<File>()
           .toList();
@@ -543,37 +544,53 @@ class BackupService {
     }
   }
 
-  // Clean old backups (keep only latest 3)
-  Future<void> _cleanupOldBackupsInDirectory(Directory backupDir) async {
+  // Clean old backups (keep only latest 3) - Health app approach
+  Future<void> _cleanOldBackups(Directory backupDir) async {
     try {
       final files = await backupDir.list().toList();
 
-      final backupFiles = files
-          .where((file) =>
-              file is File &&
-              file.path.endsWith('.enc') &&
-              path.basename(file.path).startsWith('my_records'))
+      // Clean up any existing JSON files (legacy from previous versions)
+      final jsonFiles = files
+          .where((file) => file is File && file.path.endsWith('.json.enc'))
           .cast<File>()
           .toList();
 
-      if (backupFiles.length > _maxBackupFiles) {
+      for (final jsonFile in jsonFiles) {
+        await jsonFile.delete();
+        debugPrint('Removed legacy JSON backup file: ${jsonFile.path}');
+      }
+
+      final backupFiles = files
+          .where((file) => file is File && file.path.endsWith('.db.enc'))
+          .cast<File>()
+          .toList();
+
+      if (backupFiles.length > 3) {
         // Sort by modification time (oldest first)
         backupFiles.sort(
             (a, b) => a.statSync().modified.compareTo(b.statSync().modified));
 
         // Delete oldest files, keep only latest 3
-        final filesToDelete =
-            backupFiles.take(backupFiles.length - _maxBackupFiles);
+        final filesToDelete = backupFiles.take(backupFiles.length - 3);
         for (final file in filesToDelete) {
           await file.delete();
-          if (kDebugMode) {
-            print('Deleted old backup: ${file.path}');
-          }
         }
       }
     } catch (e) {
+      debugPrint('Error cleaning old backups: $e');
+    }
+  }
+
+  // Public method to manually trigger cleanup for testing
+  Future<void> testCleanupOldBackups() async {
+    try {
+      final backupDir = await getBackupDirectory();
+      if (await backupDir.exists()) {
+        await _cleanOldBackups(backupDir);
+      }
+    } catch (e) {
       if (kDebugMode) {
-        print('Error cleaning old backups: $e');
+        print('Test cleanup error: $e');
       }
     }
   }
@@ -850,5 +867,28 @@ class BackupService {
       'record_count': actualBackupData?['totalRecords'] ?? 0,
       'version': actualBackupData?['version'] ?? '1.0',
     };
+  }
+
+  /// Manually force cleanup of old backup files
+  /// This method can be called to ensure only the latest 3 backups are kept
+  Future<void> forceCleanupOldBackups() async {
+    try {
+      final backupDir = await getBackupDirectory();
+      if (await backupDir.exists()) {
+        await _cleanOldBackups(backupDir);
+        if (kDebugMode) {
+          print('Manual backup cleanup completed successfully');
+        }
+      } else {
+        if (kDebugMode) {
+          print('Backup directory does not exist, no cleanup needed');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error during manual backup cleanup: $e');
+      }
+      throw Exception('Failed to cleanup old backups: $e');
+    }
   }
 }

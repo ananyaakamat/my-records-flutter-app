@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database_helper.dart';
+import '../../../core/services/automatic_backup_service.dart';
 import '../domain/record_model.dart';
 import '../../folders/providers/folder_provider.dart';
 
@@ -8,6 +9,8 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
   RecordNotifier() : super([]);
 
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final AutomaticBackupService _automaticBackupService =
+      AutomaticBackupService.instance;
 
   Future<void> loadRecordsForFolder(int folderId) async {
     try {
@@ -45,6 +48,12 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
 
       // Update folder record count
       await _updateFolderRecordCount(record.folderId, ref);
+
+      // Trigger automatic backup after record creation
+      await _automaticBackupService.triggerRecordBackup(
+        operation: 'create',
+        recordName: newRecord.fieldName,
+      );
     } catch (e) {
       debugPrint('Error adding record: $e');
     }
@@ -67,6 +76,12 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
       updatedList.sort((a, b) =>
           a.fieldName.toLowerCase().compareTo(b.fieldName.toLowerCase()));
       state = updatedList;
+
+      // Trigger automatic backup after record update
+      await _automaticBackupService.triggerRecordBackup(
+        operation: 'update',
+        recordName: updatedRecord.fieldName,
+      );
     } catch (e) {
       debugPrint('Error updating record: $e');
     }
@@ -74,11 +89,20 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
 
   Future<void> deleteRecord(int recordId, int folderId, WidgetRef ref) async {
     try {
+      // Get record name before deletion for logging
+      final recordToDelete = state.firstWhere((r) => r.id == recordId);
+
       await _databaseHelper.delete('records', 'id = ?', [recordId]);
       state = state.where((record) => record.id != recordId).toList();
 
       // Update folder record count
       await _updateFolderRecordCount(folderId, ref);
+
+      // Trigger automatic backup after record deletion
+      await _automaticBackupService.triggerRecordBackup(
+        operation: 'delete',
+        recordName: recordToDelete.fieldName,
+      );
     } catch (e) {
       debugPrint('Error deleting record: $e');
     }
@@ -131,6 +155,12 @@ class RecordNotifier extends StateNotifier<List<RecordModel>> {
 
       // Update folder record count
       await _updateFolderRecordCount(folderId, ref);
+
+      // Trigger automatic backup after record duplication
+      await _automaticBackupService.triggerRecordBackup(
+        operation: 'duplicate',
+        recordName: newRecord.fieldName,
+      );
     } catch (e) {
       debugPrint('Error duplicating record: $e');
     }
