@@ -935,6 +935,25 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
               Text('• Long press on text in details view to copy to clipboard'),
               SizedBox(height: 18),
               Text(
+                'Field Value Management',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              Text(
+                  '• Add multiple values using the + button in Add/Edit dialog'),
+              SizedBox(height: 6),
+              Text(
+                  '• Drag handle (≡) appears when you have multiple field values'),
+              SizedBox(height: 6),
+              Text('• Touch and drag the handle to reorder field values'),
+              SizedBox(height: 6),
+              Text('• Remove individual values using the red ⊖ button'),
+              SizedBox(height: 6),
+              Text('• Drag handles only appear during Add/Edit operations'),
+              SizedBox(height: 6),
+              Text('• Field values maintain their new order after saving'),
+              SizedBox(height: 18),
+              Text(
                 'Search & Navigation',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
