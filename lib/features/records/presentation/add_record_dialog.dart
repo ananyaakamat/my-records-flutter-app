@@ -95,91 +95,92 @@ class _AddRecordDialogState extends ConsumerState<AddRecordDialog> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 400,
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
         child: Container(
           padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Row(
-                    children: [
-                      Icon(
-                        isEditing ? Icons.edit : Icons.add,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          isEditing ? 'Edit Record' : 'Add New Record',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Field Name Input
-                  TextFormField(
-                    controller: _fieldNameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(
-                      labelText: 'Field Name',
-                      hintText: 'e.g., Phone Number, Address, Notes',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.label),
+            child: Column(
+              children: [
+                // Title - Fixed at top
+                Row(
+                  children: [
+                    Icon(
+                      isEditing ? Icons.edit : Icons.add,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a field name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Field Values Section
-                  Row(
-                    children: [
-                      Text(
-                        'Field Values',
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isEditing ? 'Edit Record' : 'Add New Record',
                         style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
                       ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: _addFieldValue,
-                        icon: const Icon(Icons.add),
-                        tooltip: 'Add another field value',
-                        style: IconButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                          minimumSize: const Size(32, 32),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
 
-                  // Field Value Inputs - Use ReorderableListView when multiple values
-                  _fieldValueControllers.length > 1
-                      ? SizedBox(
-                          height: _fieldValueControllers.length * 80.0,
-                          child: ReorderableListView.builder(
+                // Scrollable content
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Field Name Input
+                        TextFormField(
+                          controller: _fieldNameController,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'Field Name',
+                            hintText: 'e.g., Phone Number, Address, Notes',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.label),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter a field name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Field Values Section
+                        Row(
+                          children: [
+                            Text(
+                              'Field Values',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: _addFieldValue,
+                              icon: const Icon(Icons.add),
+                              tooltip: 'Add another field value',
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onPrimary,
+                                minimumSize: const Size(32, 32),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Field Value Inputs - Scrollable with proper reordering
+                        if (_fieldValueControllers.length > 1)
+                          ReorderableListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             onReorder: _onReorder,
@@ -240,87 +241,96 @@ class _AddRecordDialogState extends ConsumerState<AddRecordDialog> {
                                 ),
                               );
                             },
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: TextFormField(
-                            controller: _fieldValueControllers[0],
-                            decoration: const InputDecoration(
-                              labelText: 'Field Value',
-                              hintText: 'Enter the value for this field',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.edit),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: TextFormField(
+                              controller: _fieldValueControllers[0],
+                              decoration: const InputDecoration(
+                                labelText: 'Field Value',
+                                hintText: 'Enter the value for this field',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.edit),
+                              ),
+                              maxLines: 3,
+                              minLines: 1,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a field value';
+                                }
+                                return null;
+                              },
                             ),
-                            maxLines: 3,
-                            minLines: 1,
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Please enter a field value';
-                              }
-                              return null;
-                            },
                           ),
-                        ),
-                  const SizedBox(height: 24),
 
-                  // Help Text
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _fieldValueControllers.length > 1 
-                                ? 'Create custom field-value pairs to store any information you need. Use the drag handle (≡) to reorder multiple values.'
-                                : 'Create custom field-value pairs to store any information you need.',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
+                        const SizedBox(height: 24),
+
+                        // Help Text
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 16,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _fieldValueControllers.length > 1
+                                      ? 'Create custom field-value pairs to store any information you need. Use the drag handle (≡) to reorder multiple values.'
+                                      : 'Create custom field-value pairs to store any information you need.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
 
-                  // Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
+                const SizedBox(height: 24),
+
+                // Buttons - Fixed at bottom
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: _saveRecord,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
                       ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _saveRecord,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                        ),
-                        child: Text(isEditing ? 'Update' : 'Create'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                      child: Text(isEditing ? 'Update' : 'Create'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
