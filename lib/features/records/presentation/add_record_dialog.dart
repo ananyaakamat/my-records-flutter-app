@@ -73,6 +73,17 @@ class _AddRecordDialogState extends ConsumerState<AddRecordDialog> {
     }
   }
 
+  /// Reorder field values when dragged
+  void _onReorder(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final controller = _fieldValueControllers.removeAt(oldIndex);
+      _fieldValueControllers.insert(newIndex, controller);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.recordToEdit != null;
@@ -164,46 +175,93 @@ class _AddRecordDialogState extends ConsumerState<AddRecordDialog> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Field Value Inputs
-                  ...List.generate(_fieldValueControllers.length, (index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _fieldValueControllers[index],
-                              decoration: InputDecoration(
-                                labelText: _fieldValueControllers.length > 1
-                                    ? 'Field Value ${index + 1}'
-                                    : 'Field Value',
-                                hintText: 'Enter the value for this field',
-                                border: const OutlineInputBorder(),
-                                prefixIcon: const Icon(Icons.edit),
-                              ),
-                              maxLines: 3,
-                              minLines: 1,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter a field value';
-                                }
-                                return null;
-                              },
-                            ),
+                  // Field Value Inputs - Use ReorderableListView when multiple values
+                  _fieldValueControllers.length > 1
+                      ? SizedBox(
+                          height: _fieldValueControllers.length * 80.0,
+                          child: ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            onReorder: _onReorder,
+                            itemCount: _fieldValueControllers.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                key: ValueKey('field_value_$index'),
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: Row(
+                                  children: [
+                                    // Drag handle
+                                    Container(
+                                      width: 24,
+                                      height: 60,
+                                      alignment: Alignment.center,
+                                      child: ReorderableDragStartListener(
+                                        index: index,
+                                        child: Icon(
+                                          Icons.drag_handle,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller:
+                                            _fieldValueControllers[index],
+                                        decoration: InputDecoration(
+                                          labelText: 'Field Value ${index + 1}',
+                                          hintText:
+                                              'Enter the value for this field',
+                                          border: const OutlineInputBorder(),
+                                          prefixIcon: const Icon(Icons.edit),
+                                        ),
+                                        maxLines: 3,
+                                        minLines: 1,
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Please enter a field value';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      onPressed: () => _removeFieldValue(index),
+                                      icon: const Icon(Icons.remove_circle),
+                                      color: Colors.red,
+                                      tooltip: 'Remove this field value',
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
-                          if (_fieldValueControllers.length > 1) ...[
-                            const SizedBox(width: 8),
-                            IconButton(
-                              onPressed: () => _removeFieldValue(index),
-                              icon: const Icon(Icons.remove_circle),
-                              color: Colors.red,
-                              tooltip: 'Remove this field value',
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: TextFormField(
+                            controller: _fieldValueControllers[0],
+                            decoration: const InputDecoration(
+                              labelText: 'Field Value',
+                              hintText: 'Enter the value for this field',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.edit),
                             ),
-                          ],
-                        ],
-                      ),
-                    );
-                  }),
+                            maxLines: 3,
+                            minLines: 1,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter a field value';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
                   const SizedBox(height: 24),
 
                   // Help Text
@@ -224,7 +282,9 @@ class _AddRecordDialogState extends ConsumerState<AddRecordDialog> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Create custom field-value pairs to store any information you need.',
+                            _fieldValueControllers.length > 1 
+                                ? 'Create custom field-value pairs to store any information you need. Use the drag handle (≡) to reorder multiple values.'
+                                : 'Create custom field-value pairs to store any information you need.',
                             style:
                                 Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: Theme.of(context)
