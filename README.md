@@ -7,9 +7,10 @@ A comprehensive Flutter application for organizing and managing personal documen
 ### 📂 Core Organization
 
 - **Folder-Based Organization**: Create custom folders to categorize your records
-- **� Customizable Folders**: Choose from multiple colors and icons for folder personalization
+- **🎨 Customizable Folders**: Choose from multiple colors and icons for folder personalization
 - **📊 Record Count Tracking**: Visual indicators showing number of records in each folder
-- **🔄 Drag & Drop Reordering**: Organize folders by dragging them to preferred positions
+- **🔄 Drag & Drop Reordering**: Organize folders and field values by dragging them to preferred positions
+- **📝 Multi-Value Records**: Store multiple values per record field with drag-to-reorder functionality
 
 ### 📋 Bulk Operations\*\*: Delete all folders and records with comprehensive safety warnings
 
@@ -44,9 +45,10 @@ A comprehensive Flutter application for organizing and managing personal documen
 - **Accurate Statistics**: ✨ **NEW** - Backup dialogs show precise record counts with automatic orphaned record cleanup
 - **Data Integrity**: ✨ **NEW** - Automatic cleanup of orphaned records during backup creation
 - **Smart File Management**: Automatically maintains 3 most recent backups
+- **Readable Date Format**: ✨ **NEW** - User-friendly date/time display (21 Nov 2024, 2:30 PM)
 - **Cloud Compatibility**: JSON format backups saved to Downloads/my_records folder
 - **One-Click Restore**: Select and restore from any previous backup
-- **Backup Sharing**: Share backup files directly from the app
+- **Backup Sharing**: Share backup files directly from the app with formatted metadata
 
 ### 🎨 User Experience
 
@@ -179,7 +181,7 @@ lib/
 
 ## 🔧 Recent Updates
 
-### 🆕 Latest Enhancements (October 30, 2025)
+### 🆕 Latest Enhancements (November 21, 2024)
 
 #### ✨ Dynamic Date Interpretation System
 
@@ -207,18 +209,40 @@ The app now intelligently recognizes dates in these formats within Field Values:
 #### 🎯 Enhanced User Experience
 
 - **Interactive Record Details**: Tap any record to view comprehensive details with automatic date interpretation
+- **Drag-and-Drop Field Values**: ✨ **NEW** - Reorder field values within Add/Edit dialogs using intuitive drag handles
 - **Smart Year Handling**: 2-digit years are intelligently converted (< 50 = 2000s, >= 50 = 1900s)
 - **Case-Insensitive**: Works with any combination of uppercase/lowercase month names
 - **Contextual Information**: Automatic age/expiry calculations provide meaningful context
 - **Visual Indicators**: Red text for expired items, clear formatting for all date interpretations
+- **Improved Dialog Layout**: Fixed scrolling issues in Add/Edit Record dialogs for better accessibility
 
 #### 📖 Comprehensive Help System
 
-- **Updated Help Screens**: Complete guidance on record interaction and date format support
-- **Clear Examples**: Detailed examples for all supported date formats
+- **Updated Help Screens**: Complete guidance on record interaction, folder management, and date format support
+- **Drag-and-Drop Instructions**: Clear examples and step-by-step guidance for field value reordering
+- **Interactive Tutorials**: Help dialogs accessible from every screen with contextual information
+- **Feature Documentation**: Detailed explanations of all app features and capabilities
 - **User-Friendly Instructions**: Step-by-step guidance for optimal app usage
 
-### ✅ Previous Updates (October 29, 2025)
+#### 🚀 UI/UX Improvements
+
+- **Fixed Dialog Scrolling**: Resolved Add/Edit Record dialog layout issues for better field value accessibility
+- **Improved Touch Targets**: Enhanced drag handles and button sizing for better mobile interaction
+- **Visual Feedback**: Clear visual indicators for drag operations and reordering states
+- **Responsive Design**: Optimized layouts for different screen sizes and orientations
+
+### ✅ Previous Updates (November 21, 2024)
+
+#### Backup Date Format Standardization
+
+**Enhancement**: Standardized backup entry date/time display format for improved readability and consistency.
+
+**Updates Made**:
+
+- **Readable Date Format**: Changed from numeric format (21/11/2024 14:30) to readable format (21 Nov 2024, 2:30 PM)
+- **Custom Formatting Function**: Implemented `_formatDateTime()` to replace DateFormat dependency
+- **Consistent Display**: Applied same formatting to backup listing and sharing functionality
+- **Improved User Experience**: More intuitive date representation matching reference specifications
 
 #### Major Fix: Backup Record Count Accuracy
 
@@ -228,25 +252,43 @@ The app now intelligently recognizes dates in these formats within Field Values:
 
 ### 🛠️ Technical Improvements Implemented
 
-1. **Orphaned Record Detection & Cleanup**:
+1. **Enhanced Field Value Management**:
+
+   - Implemented ReorderableListView for intuitive drag-and-drop functionality
+   - Added persistent field value ordering with proper state management
+   - Fixed dialog layout constraints for better scrollability and accessibility
+
+2. **Improved Date Formatting**:
+
+   - Custom `_formatDateTime()` function replacing DateFormat dependency
+   - Consistent readable format across all backup-related features
+   - Reduced app bundle size by removing unnecessary intl dependency
+
+3. **Orphaned Record Detection & Cleanup**:
 
    - Automatically identifies records belonging to deleted folders during backup creation
    - Performs real-time database cleanup to remove orphaned records
    - Ensures data integrity by preventing stale record accumulation
 
-2. **Enhanced Backup Statistics**:
+4. **Enhanced Backup Statistics**:
+
+   - Automatically identifies records belonging to deleted folders during backup creation
+   - Performs real-time database cleanup to remove orphaned records
+   - Ensures data integrity by preventing stale record accumulation
+
+5. **Enhanced Backup Statistics**:
 
    - Backup counts now reflect actual valid records only
    - Filters out orphaned records before calculating statistics
    - Provides accurate folder and record counts in success dialogs
 
-3. **Comprehensive Debug Logging**:
+6. **Comprehensive Debug Logging**:
 
    - Added detailed logging for backup record filtering process
    - Tracks total records vs. valid records during backup creation
    - Logs orphaned record cleanup operations for transparency
 
-4. **Database Integrity Maintenance**:
+7. **Database Integrity Maintenance**:
    - Automatic cleanup prevents database bloat from orphaned records
    - Improves app performance by removing unnecessary data
    - Maintains referential integrity between folders and records
@@ -307,6 +349,13 @@ flutter test               # Run unit tests
 flutter analyze           # Static code analysis
 flutter build apk --debug # Build debug APK
 flutter build apk --release # Build production APK
+
+# Install to connected device
+flutter install --debug
+
+# Build time benchmarks (Galaxy A71)
+# Debug APK: ~72 seconds
+# Installation: ~133 seconds
 ```
 
 ### Code Quality Standards
@@ -348,19 +397,25 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📊 Project Status
 
-- **Current Version**: 1.0.0
-- **Last Updated**: October 30, 2025
+- **Current Version**: 1.0.0+1
+- **Last Updated**: November 21, 2024
 - **Active Development**: ✅ Ongoing
 - **Production Ready**: ✅ Yes
-- **Platform Support**: 📱 Android (iOS support planned)
+- **Platform Support**: 📱 Android (API level 21+)
+- **Build Status**: ✅ Clean builds (72.3s APK compilation)
+- **Test Coverage**: 🛠️ Physical device tested (Samsung Galaxy A71)
+- **Repository**: [GitHub - ananyaakamat/my-records-flutter-app](https://github.com/ananyaakamat/my-records-flutter-app)
 
 ## 🔮 Upcoming Features
 
+- **Enhanced Search**: Advanced filtering and sorting options
 - **Cloud Sync**: Automatic cloud backup integration
-- **Document Scanning**: Built-in camera-based document scanning
+- **Document Scanning**: Built-in camera-based document scanning with OCR
 - **Export Options**: PDF and Excel export capabilities
 - **Sharing**: Direct sharing of individual records or folders
 - **iOS Version**: Native iOS application
+- **Multi-Language**: Localization for multiple languages
+- **Tags & Categories**: Advanced tagging system for better organization
 
 ---
 
