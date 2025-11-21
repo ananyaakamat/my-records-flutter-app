@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:intl/intl.dart';
 import '../../../core/services/backup_service.dart';
 import '../../folders/providers/folder_provider.dart';
 
@@ -39,6 +38,31 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   List<BackupInfo> _availableBackups = [];
   bool _backupsLoaded = false;
   Timer? _refreshTimer;
+
+  String _formatDateTime(DateTime dateTime) {
+    final months = [
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+
+    return '${dateTime.day} ${months[dateTime.month]} ${dateTime.year}, $displayHour:${minute.toString().padLeft(2, '0')} $period';
+  }
 
   @override
   void initState() {
@@ -382,7 +406,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       final result = await Share.shareXFiles(
         [XFile(backupFile.path)],
         text: 'My Records Backup - ${backup.displayName}\n\n'
-            'Created: ${backup.createdTime.day}/${backup.createdTime.month}/${backup.createdTime.year}\n'
+            'Created: ${_formatDateTime(backup.createdTime)}\n'
             'Size: ${(backup.size / 1024).toStringAsFixed(1)} KB',
         subject: 'My Records Backup - ${backup.displayName}',
       );
@@ -1018,8 +1042,6 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   }
 
   Widget _buildBackupItem(BackupInfo backup) {
-    final formatter = DateFormat('dd/MM/yyyy HH:mm');
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1057,7 +1079,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${(backup.size / 1024).toStringAsFixed(1)} KB â€¢ ${formatter.format(backup.createdTime)}',
+                      '${(backup.size / 1024).toStringAsFixed(1)} KB • ${_formatDateTime(backup.createdTime)}',
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade400,
