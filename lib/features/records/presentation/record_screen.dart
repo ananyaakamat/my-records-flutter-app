@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../main.dart';
 import '../../folders/domain/folder_model.dart';
 import '../../folders/providers/folder_provider.dart';
@@ -643,6 +644,17 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                   ],
                 ),
               ),
+              const PopupMenuItem(
+                value: 'share',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.share, size: 18),
+                    SizedBox(width: 8),
+                    Text('Share'),
+                  ],
+                ),
+              ),
             ],
           ),
           onTap: () {
@@ -677,6 +689,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         break;
       case 'delete':
         _showDeleteConfirmationDialog(context, record);
+        break;
+      case 'share':
+        _shareRecord(record);
         break;
     }
   }
@@ -777,6 +792,22 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         );
       },
     );
+  }
+
+  void _shareRecord(RecordModel record) {
+    // Format the record data for sharing (excluding dates)
+    final StringBuffer shareContent = StringBuffer();
+    shareContent.writeln(record.fieldName);
+    shareContent.writeln('=' * record.fieldName.length);
+    shareContent.writeln();
+
+    // Add all field values
+    for (final value in record.fieldValues) {
+      shareContent.writeln(value);
+    }
+
+    // Share the formatted content
+    Share.share(shareContent.toString());
   }
 
   void _showDeleteConfirmationDialog(BuildContext context, RecordModel record) {

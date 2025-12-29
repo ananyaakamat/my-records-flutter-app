@@ -36,6 +36,15 @@ android {
             // For production release, configure proper signing keys.
             signingConfig = signingConfigs.debug
         }
+        debug {
+            // Custom APK name for debug builds
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "myrecords-${variant.buildType.name}.apk"
+        }
     }
 }
 
