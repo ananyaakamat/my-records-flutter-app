@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/services/backup_service.dart';
 import '../../folders/providers/folder_provider.dart';
 
@@ -29,7 +30,8 @@ class BackupRestoreScreen extends ConsumerStatefulWidget {
       _BackupRestoreScreenState();
 }
 
-class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
+class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen>
+    with WidgetsBindingObserver {
   final BackupService _backupService = BackupService.instance;
   bool _isLoading = false;
   bool _autoBackupEnabled = false;
@@ -38,6 +40,8 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   List<BackupInfo> _availableBackups = [];
   bool _backupsLoaded = false;
   Timer? _refreshTimer;
+  Timer? _backupListRefreshTimer;
+  int _lastBackupCount = 0;
 
   String _formatDateTime(DateTime dateTime) {
     final months = [
@@ -67,15 +71,128 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeBackupService();
     _loadSettings();
     _loadBackupInfo();
-    _loadAvailableBackups();
+    _requestPermissionsAndLoadBackups();
 
     // Start timer to refresh backup info every minute
     _refreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       _loadBackupInfo();
     });
+
+    // Start timer to check for new backup files every 5 seconds
+    // This detects files copied while app is in foreground
+    _backupListRefreshTimer =
+        Timer.periodic(const Duration(seconds: 5), (timer) {
+      _checkForNewBackups();
+    });
+  }
+
+  Future<void> _requestPermissionsAndLoadBackups() async {
+    if (!Platform.isAndroid) {
+      await _loadAvailableBackups();
+      return;
+    }
+
+    // Check if we already have permission
+    if (await Permission.manageExternalStorage.isGranted ||
+        await Permission.storage.isGranted) {
+      if (kDebugMode) {
+        print('Storage permission already granted');
+      }
+      await _loadAvailableBackups();
+      return;
+    }
+
+    // For Android 11+, MANAGE_EXTERNAL_STORAGE cannot be requested via dialog
+    // User must manually enable it in Settings
+    if (kDebugMode) {
+      print('Storage permission not granted - showing settings prompt');
+    }
+
+    if (mounted) {
+      _showStoragePermissionDialog();
+    }
+  }
+
+  void _showStoragePermissionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Storage Permission Required'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'To access backup files (including those copied from other devices), this app needs storage permission.',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Steps:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '1. Tap "Open Settings" below\n'
+              '2. Find and tap "Permissions"\n'
+              '3. Enable "Files and media" or "Storage"\n'
+              '4. Choose "Allow" or "Allow all files"',
+              style: TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Load with whatever permission we have
+              _loadAvailableBackups();
+            },
+            child: const Text('Skip'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final opened = await openAppSettings();
+              if (kDebugMode) {
+                print('Settings opened: $opened');
+              }
+              // Wait a bit and try loading again
+              await Future.delayed(const Duration(seconds: 1));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'After granting permission, tap the refresh button to reload backups',
+                    ),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Force refresh backups when app resumes
+      // This ensures externally copied files are detected
+      if (kDebugMode) {
+        print('App resumed - refreshing backup list');
+      }
+      _refreshBackups();
+    }
   }
 
   Future<void> _initializeBackupService() async {
@@ -90,7 +207,9 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    _backupListRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -130,21 +249,46 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
   }
 
   Future<void> _loadAvailableBackups() async {
-    if (_backupsLoaded) return;
-
+    // ALWAYS scan filesystem - do not use cached state
+    // This is critical for detecting manually copied backup files
     setState(() {
       _isLoading = true;
     });
 
     try {
+      if (kDebugMode) {
+        print('=== STARTING BACKUP LOAD ===');
+      }
+
+      // Scan for externally copied files first
+      await _backupService.scanForExternalBackups();
+
       final backupPaths = await _backupService.getAvailableBackups();
+
+      if (kDebugMode) {
+        print('Received ${backupPaths.length} backup paths from service:');
+        for (var path in backupPaths) {
+          print('  Path: $path');
+        }
+      }
+
       List<BackupInfo> backups = [];
 
       for (String path in backupPaths) {
+        if (kDebugMode) {
+          print('Processing path: $path');
+        }
         final file = File(path);
-        if (await file.exists()) {
+        final exists = await file.exists();
+        if (kDebugMode) {
+          print('  File exists: $exists');
+        }
+        if (exists) {
           final stat = await file.stat();
           final fileName = file.path.split('/').last.split('\\').last;
+          if (kDebugMode) {
+            print('  Adding to list: $fileName (${stat.size} bytes)');
+          }
           backups.add(BackupInfo(
             id: fileName,
             displayName: fileName,
@@ -154,16 +298,27 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
         }
       }
 
+      if (kDebugMode) {
+        print('Total backups to display: ${backups.length}');
+      }
+
       // Sort by creation time (newest first)
       backups.sort((a, b) => b.createdTime.compareTo(a.createdTime));
 
       setState(() {
         _availableBackups = backups;
         _backupsLoaded = true;
+        _lastBackupCount = backups.length;
       });
+
+      if (kDebugMode) {
+        print('UI updated with ${_availableBackups.length} backups');
+        print('=== BACKUP LOAD COMPLETE ===');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Failed to load backups: $e');
+        print('Stack trace: ${StackTrace.current}');
       }
     } finally {
       setState(() {
@@ -316,11 +471,36 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
     );
   }
 
+  Future<void> _checkForNewBackups() async {
+    // Silently check if backup count has changed
+    // Don't show loading indicator or clear existing list
+    try {
+      final backupPaths = await _backupService.getAvailableBackups();
+      if (backupPaths.length != _lastBackupCount) {
+        if (kDebugMode) {
+          print(
+              'Backup count changed: $_lastBackupCount -> ${backupPaths.length}');
+        }
+        // Count changed, do full refresh
+        await _refreshBackups();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error checking for new backups: $e');
+      }
+    }
+  }
+
   Future<void> _refreshBackups() async {
     setState(() {
       _backupsLoaded = false;
       _availableBackups.clear();
     });
+
+    // Add a small delay to allow file system to sync
+    // This is especially important on Android when files are copied externally
+    await Future.delayed(const Duration(milliseconds: 300));
+
     await _loadAvailableBackups();
   }
 
@@ -404,7 +584,7 @@ class _BackupRestoreScreenState extends ConsumerState<BackupRestoreScreen> {
       }
 
       final result = await Share.shareXFiles(
-        [XFile(backupFile.path)],
+        [XFile(backupFile.path, name: backup.id)],
         text: 'My Records Backup - ${backup.displayName}\n\n'
             'Created: ${_formatDateTime(backup.createdTime)}\n'
             'Size: ${(backup.size / 1024).toStringAsFixed(1)} KB',

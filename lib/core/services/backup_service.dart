@@ -11,6 +11,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../database/database_helper.dart'; // WorkManager callback for background backup task
 
@@ -95,9 +96,37 @@ class BackupService {
     );
   }
 
+  // Check and request storage permissions
+  Future<bool> checkStoragePermission() async {
+    if (!Platform.isAndroid) {
+      return true; // No permission needed on other platforms
+    }
+
+    // Check Android version
+    if (await Permission.manageExternalStorage.isGranted) {
+      return true;
+    }
+
+    // For Android 11+ (API 30+), we need MANAGE_EXTERNAL_STORAGE
+    if (await Permission.manageExternalStorage.request().isGranted) {
+      return true;
+    }
+
+    // Fallback to legacy storage permissions
+    if (await Permission.storage.isGranted) {
+      return true;
+    }
+
+    final status = await Permission.storage.request();
+    return status.isGranted;
+  }
+
   // Get Downloads folder path
   Future<Directory> _getDownloadsDirectory() async {
     if (Platform.isAndroid) {
+      // Ensure we have storage permission
+      await checkStoragePermission();
+
       // For Android, use the Downloads directory
       final directory = await getExternalStorageDirectory();
       if (directory != null) {
@@ -329,27 +358,115 @@ class BackupService {
 
   Future<List<String>> getAvailableBackups() async {
     try {
-      final backupDir = await getBackupDirectory();
-      if (!await backupDir.exists()) {
+      // Check permissions first
+      final hasPermission = await checkStoragePermission();
+      if (!hasPermission) {
+        if (kDebugMode) {
+          debugPrint('Storage permission not granted');
+        }
         return [];
       }
 
-      final files = await backupDir
-          .list()
-          .where((entity) =>
-              entity is File &&
-              entity.path.endsWith('.db.enc') &&
-              path.basename(entity.path).startsWith('my_records'))
-          .cast<File>()
-          .toList();
+      final backupDir = await getBackupDirectory();
+      if (kDebugMode) {
+        debugPrint('Scanning backup directory: ${backupDir.path}');
+      }
 
-      files.sort(
-          (a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      if (!await backupDir.exists()) {
+        if (kDebugMode) {
+          debugPrint('Backup directory does not exist');
+        }
+        return [];
+      }
+
+      // Force directory refresh by creating a new Directory instance
+      // This helps avoid cached directory listings
+      final freshDir = Directory(backupDir.path);
+
+      // List all files in the directory using direct path reading
+      final List<FileSystemEntity> allEntities = [];
+      try {
+        await for (var entity
+            in freshDir.list(recursive: false, followLinks: false)) {
+          allEntities.add(entity);
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error listing directory: $e');
+        }
+      }
+
+      if (kDebugMode) {
+        debugPrint('Found ${allEntities.length} entities in backup directory');
+        for (var entity in allEntities) {
+          debugPrint(
+              '  - ${path.basename(entity.path)} (${entity.runtimeType})');
+        }
+      }
+
+      // Filter for valid backup files
+      final List<File> files = [];
+      for (var entity in allEntities) {
+        if (entity is File) {
+          final fileName = path.basename(entity.path);
+          if (kDebugMode) {
+            debugPrint('Checking file: $fileName');
+          }
+
+          // Accept .db.enc files that contain 'my_record' (case-insensitive)
+          // This catches both 'my_records*.db.enc' and 'My Records Backup - my_records*.db.enc'
+          if (fileName.toLowerCase().endsWith('.db.enc') &&
+              fileName.toLowerCase().contains('my_record')) {
+            // Create a fresh File instance to avoid caching
+            final freshFile = File(entity.path);
+            // Verify file actually exists and is readable
+            try {
+              final exists = await freshFile.exists();
+              if (exists) {
+                // Try to get file stats to ensure it's readable
+                final stat = await freshFile.stat();
+                if (kDebugMode) {
+                  debugPrint(
+                      'Valid backup file: $fileName (${stat.size} bytes, modified: ${stat.modified})');
+                }
+                files.add(freshFile);
+              } else {
+                if (kDebugMode) {
+                  debugPrint('File does not exist: $fileName');
+                }
+              }
+            } catch (e) {
+              if (kDebugMode) {
+                debugPrint('Error accessing file $fileName: $e');
+              }
+            }
+          }
+        }
+      }
+
+      if (kDebugMode) {
+        debugPrint('Found ${files.length} valid backup files');
+      }
+
+      // Sort by modification time (newest first)
+      files.sort((a, b) {
+        try {
+          final aStat = a.statSync();
+          final bStat = b.statSync();
+          return bStat.modified.compareTo(aStat.modified);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Error sorting files: $e');
+          }
+          return 0;
+        }
+      });
 
       return files.map((file) => file.path).toList();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error getting available backups: $e');
+        debugPrint('Stack trace: ${StackTrace.current}');
       }
       return [];
     }
@@ -369,6 +486,60 @@ class BackupService {
       );
     } catch (e) {
       throw Exception('Failed to share backup: $e');
+    }
+  }
+
+  /// Scan the backup directory for manually copied files
+  /// This method performs a thorough scan to detect files that may have been
+  /// copied to the backup folder from external sources
+  Future<void> scanForExternalBackups() async {
+    try {
+      final backupDir = await getBackupDirectory();
+      if (!await backupDir.exists()) {
+        if (kDebugMode) {
+          debugPrint('Backup directory does not exist, creating...');
+        }
+        await backupDir.create(recursive: true);
+        return;
+      }
+
+      if (kDebugMode) {
+        debugPrint('Scanning for external backup files...');
+      }
+
+      // Force directory refresh by re-checking existence
+      final dirExists = await backupDir.exists();
+      if (!dirExists) {
+        if (kDebugMode) {
+          debugPrint('Backup directory not accessible');
+        }
+        return;
+      }
+
+      // List all files directly without filtering
+      final allFiles = <FileSystemEntity>[];
+      await for (var entity
+          in backupDir.list(recursive: false, followLinks: false)) {
+        allFiles.add(entity);
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+            'Found ${allFiles.length} total entities in backup directory');
+        for (var file in allFiles) {
+          if (file is File) {
+            final fileName = path.basename(file.path);
+            final fileExists = await file.exists();
+            if (kDebugMode) {
+              debugPrint('  File: $fileName (exists: $fileExists)');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error scanning for external backups: $e');
+      }
     }
   }
 
